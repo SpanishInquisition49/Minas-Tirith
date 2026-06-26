@@ -13,40 +13,63 @@ pub struct OpenLibraryManager {
 
 #[derive(Debug, Deserialize)]
 struct OpenLibraryResponse {
-    docs: Vec<OpenLibraryDoc>,
+    docs: Vec<OpenLibraryItem>,
 }
 
 #[derive(Debug, Deserialize)]
-struct OpenLibraryDoc {
+pub struct OpenLibraryItem {
     title: String,
     author_name: Option<Vec<String>>,
     first_publish_year: Option<i32>,
-    cover_i: Option<i64>,
+    cover_url: Option<i64>,
     key: String,
     ia: Option<Vec<String>>,
 }
 
-fn extract_isbn_from_ia(ia: &Option<Vec<String>>) -> Option<String> {
-    ia.as_ref()?
-        .iter()
-        .find_map(|s| s.strip_prefix("isbn_").map(|isbn| isbn.to_string()))
-}
+impl ItemMetadata for OpenLibraryItem {
+    fn title(&self) -> &str {
+        &self.title
+    }
 
-impl From<OpenLibraryDoc> for ItemMetadata {
-    fn from(value: OpenLibraryDoc) -> Self {
-        Self {
-            title: value.title,
-            item_type: ItemType::Book,
-            authors: value.author_name.unwrap_or_default(),
-            isbn: extract_isbn_from_ia(&value.ia),
-            doi: None,
-            publication_date: value.first_publish_year.map(|y| y.to_string()),
-            cover_image_url: value
-                .cover_i
-                .map(|id| format!("https://covers.openlibrary.org/b/id/{}-L.jpg", id)),
-            source: "openlibrary".to_string(),
-            source_id: Some(value.key),
+    fn item_type(&self) -> ItemType {
+        // NOTE: maybe this is too specific
+        ItemType::Book
+    }
+
+    fn authors(&self) -> Vec<String> {
+        match &self.author_name {
+            Some(a) => a.clone(),
+            None => vec![],
         }
+    }
+
+    fn isbn(&self) -> Option<&str> {
+        if let Some(ia) = &self.ia {
+            ia.iter().find_map(|s| s.strip_prefix("isbn_"))
+        } else {
+            None
+        }
+    }
+
+    fn doi(&self) -> Option<&str> {
+        None
+    }
+
+    fn publication_date(&self) -> Option<String> {
+        self.first_publish_year.map(|y| y.to_string())
+    }
+
+    fn cover_image_url(&self) -> Option<String> {
+        self.cover_url
+            .map(|id| format!("https://covers.openlibrary.org/b/id/{id}-L.jpg"))
+    }
+
+    fn source(&self) -> &str {
+        "openlibrary"
+    }
+
+    fn source_id(&self) -> Option<&str> {
+        Some(&self.key)
     }
 }
 
@@ -58,10 +81,10 @@ impl OpenLibraryManager {
     }
 }
 
-impl MetadataFetcher for OpenLibraryManager {
-    const BASE_URL: &str = "https://openlibrary.org/search.json?title=";
+impl MetadataFetcher<OpenLibraryItem> for OpenLibraryManager {
+    const BASE_URL: &str = "https://openlibrary.org/search.json";
 
-    async fn fetch(&self, title: &str) -> anyhow::Result<Vec<ItemMetadata>> {
+    async fn fetch(&self, title: &str) -> anyhow::Result<Vec<OpenLibraryItem>> {
         let res = self
             .client
             .get(Self::BASE_URL)
@@ -71,7 +94,8 @@ impl MetadataFetcher for OpenLibraryManager {
             .context("Open Library API call")?;
 
         let parsed: OpenLibraryResponse = res.json().await.context("Open Library JSON parsing")?;
+        let items = parsed.docs;
 
-        Ok(parsed.docs.into_iter().map(ItemMetadata::from).collect())
+        Ok(items)
     }
 }

@@ -62,22 +62,22 @@ impl fmt::Display for Item {
     }
 }
 
-impl From<&ItemMetadata> for Item {
-    fn from(value: &ItemMetadata) -> Self {
+impl<T: ItemMetadata + Sized> From<&T> for Item {
+    fn from(value: &T) -> Self {
         let slug = value
-            .title
+            .title()
             .replace(",", "")
             .replace(" ", "-")
             .to_lowercase();
         Self {
-            title: value.title.clone(),
+            title: value.title().to_string(),
             description: None,
-            r#type: value.item_type.to_string(),
-            doi: value.doi.clone(),
-            isbn: value.isbn.clone(),
-            publication_date: value.publication_date.clone(),
+            r#type: value.item_type().to_string(),
+            doi: value.doi().map(|d| d.to_string()),
+            isbn: value.isbn().map(|i| i.to_string()),
+            publication_date: value.publication_date(),
             slug,
-            cover_image_url: value.cover_image_url.clone(),
+            cover_image_url: value.cover_image_url(),
         }
     }
 }
