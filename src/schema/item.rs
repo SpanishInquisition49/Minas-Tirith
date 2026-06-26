@@ -2,7 +2,7 @@ use core::fmt;
 
 use sqlx::types::chrono::{DateTime, Utc};
 
-use crate::metadata::common_metadata::{ItemMetadata, ItemType};
+use crate::metadata::common_metadata::ItemMetadata;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DatabaseItem {
@@ -34,52 +34,6 @@ pub struct Item {
     pub publication_date: Option<String>,
     pub slug: String,
     pub cover_image_url: Option<String>,
-}
-
-impl ItemMetadata for Item {
-    fn title(&self) -> String {
-        self.title.clone()
-    }
-
-    fn description(&self) -> Option<String> {
-        self.description.clone()
-    }
-
-    fn item_type(&self) -> ItemType {
-        ItemType::try_from(self.r#type.as_str()).unwrap_or(ItemType::Misc)
-    }
-
-    fn authors(&self) -> Vec<String> {
-        vec![]
-    }
-
-    fn isbn(&self) -> Option<String> {
-        self.isbn.clone()
-    }
-
-    fn doi(&self) -> Option<String> {
-        self.doi.clone()
-    }
-
-    fn publication_date(&self) -> Option<String> {
-        self.publication_date.clone()
-    }
-
-    fn cover_image_url(&self) -> Option<String> {
-        self.cover_image_url.clone()
-    }
-
-    fn slug(&self) -> String {
-        self.slug.clone()
-    }
-
-    fn source(&self) -> String {
-        "internal".to_string()
-    }
-
-    fn source_id(&self) -> Option<String> {
-        None
-    }
 }
 
 impl fmt::Display for Item {

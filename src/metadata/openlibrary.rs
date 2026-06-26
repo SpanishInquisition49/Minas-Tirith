@@ -1,4 +1,4 @@
-use anyhow::Context;
+use color_eyre::eyre::Context;
 use reqwest::Client;
 use serde::Deserialize;
 use slug::slugify;
@@ -22,6 +22,7 @@ pub struct OpenLibraryItem {
     title: String,
     author_name: Option<Vec<String>>,
     first_publish_year: Option<i32>,
+    #[serde(rename = "cover_i")]
     cover_url: Option<i64>,
     key: String,
     ia: Option<Vec<String>>,
@@ -95,7 +96,7 @@ impl OpenLibraryManager {
 impl MetadataFetcher<OpenLibraryItem> for OpenLibraryManager {
     const BASE_URL: &str = "https://openlibrary.org/search.json";
 
-    async fn fetch(&self, title: &str) -> anyhow::Result<Vec<OpenLibraryItem>> {
+    async fn fetch(&self, title: &str) -> color_eyre::Result<Vec<OpenLibraryItem>> {
         let res = self
             .client
             .get(Self::BASE_URL)

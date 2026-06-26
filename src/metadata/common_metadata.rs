@@ -1,6 +1,6 @@
 use core::fmt;
 
-use anyhow::anyhow;
+use color_eyre::eyre::eyre;
 
 /// Common interface for metadata from various providers
 pub trait ItemMetadata {
@@ -27,7 +27,7 @@ pub enum ItemType {
 }
 
 impl TryFrom<&str> for ItemType {
-    type Error = anyhow::Error;
+    type Error = color_eyre::eyre::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -36,7 +36,7 @@ impl TryFrom<&str> for ItemType {
             "report" => ItemType::Report,
             "thesis" => ItemType::Thesis,
             "misc" => ItemType::Misc,
-            _ => Err(anyhow!("Cannot convert {value} to ItemType"))?,
+            _ => Err(eyre!("Cannot convert {value} to ItemType"))?,
         })
     }
 }

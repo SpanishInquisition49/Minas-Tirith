@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr};
 
-use anyhow::{Context, Result as AnyhowResult};
+use color_eyre::eyre::Context;
 use directories::ProjectDirs;
 use sqlx::{
     SqlitePool,
@@ -31,7 +31,7 @@ fn get_db_path() -> PathBuf {
     data_dir.join("minastirith.db")
 }
 
-pub async fn init_db() -> AnyhowResult<SqlitePool> {
+pub async fn init_db() -> color_eyre::Result<SqlitePool> {
     let db_path = get_db_path();
     println!("DB path: {:?}", db_path);
 
@@ -48,7 +48,8 @@ pub async fn init_db() -> AnyhowResult<SqlitePool> {
 }
 
 #[tokio::main]
-async fn main() -> AnyhowResult<()> {
+async fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
     // NOTE: setting up the Database connection
     let pool = init_db().await.context("Connecting to Database")?;
     let archive = Archive::from_pool(pool);
@@ -69,7 +70,7 @@ async fn main() -> AnyhowResult<()> {
     Ok(())
 }
 
-async fn crossref(archive: &Archive) -> AnyhowResult<()> {
+async fn crossref(archive: &Archive) -> color_eyre::Result<()> {
     let crosseref = CrossrefManager::new();
     let articles = crosseref.fetch("Taming Undefined Behavior in LLVM").await?;
     if !articles.is_empty() {
@@ -82,7 +83,7 @@ async fn crossref(archive: &Archive) -> AnyhowResult<()> {
     Ok(())
 }
 
-async fn openlibrary(archive: &Archive) -> AnyhowResult<()> {
+async fn openlibrary(archive: &Archive) -> color_eyre::Result<()> {
     let openlibrary = OpenLibraryManager::new();
     let books = openlibrary
         .fetch("compilers principles, technique & tools")

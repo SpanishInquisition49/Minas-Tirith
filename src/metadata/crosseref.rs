@@ -1,4 +1,4 @@
-use anyhow::Context;
+use color_eyre::eyre::Context;
 use reqwest::Client;
 use slug::slugify;
 
@@ -130,7 +130,7 @@ impl CrossrefManager {
 impl MetadataFetcher<CrossrefItem> for CrossrefManager {
     const BASE_URL: &str = "https://api.crossref.org/works/";
 
-    async fn fetch(&self, title: &str) -> anyhow::Result<Vec<CrossrefItem>> {
+    async fn fetch(&self, title: &str) -> color_eyre::Result<Vec<CrossrefItem>> {
         let res = self
             .client
             .get(Self::BASE_URL)

@@ -1,4 +1,4 @@
-use anyhow::{Context, Ok, Result as AnyhowResult};
+use color_eyre::eyre::Context;
 use sqlx::SqlitePool;
 use sqlx::migrate::Migrator;
 
@@ -15,12 +15,12 @@ impl Archive {
         Archive { pool }
     }
 
-    pub async fn migrate(&self) -> AnyhowResult<()> {
+    pub async fn migrate(&self) -> color_eyre::Result<()> {
         MIGRATOR.run(&self.pool).await.context("Running Migrations")
     }
 
     const GET_ALL_ITEMS: &str = "SELECT * FROM items";
-    pub async fn get_all_items(&self) -> AnyhowResult<Vec<DatabaseItem>> {
+    pub async fn get_all_items(&self) -> color_eyre::Result<Vec<DatabaseItem>> {
         sqlx::query_as(Archive::GET_ALL_ITEMS)
             .fetch_all(&self.pool)
             .await
@@ -31,7 +31,7 @@ impl Archive {
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
 ";
-    pub async fn add_item<T: ItemMetadata + Sized>(&self, item: &T) -> AnyhowResult<()> {
+    pub async fn add_item<T: ItemMetadata + Sized>(&self, item: &T) -> color_eyre::Result<()> {
         sqlx::query(Archive::ADD_ITEM)
             .bind(item.title())
             .bind(item.description())
