@@ -37,8 +37,8 @@ BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS item_authors (
-  item_id TEXT NOT NULL,
-  author_id TEXT NOT NULL,
+  item_id INTEGER NOT NULL,
+  author_id INTEGER NOT NULL,
   author_order INTEGER DEFAULT 0,
   PRIMARY KEY (item_id, author_id),
   FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS tags (
 );
 
 CREATE TABLE IF NOT EXISTS item_tags (
-  item_id TEXT NOT NULL,
-  tag_id TEXT NOT NULL,
+  item_id INTEGER NOT NULL,
+  tag_id INTEGER NOT NULL,
   PRIMARY KEY (item_id, tag_id),
   FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
   FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
@@ -68,8 +68,8 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE TABLE IF NOT EXISTS item_categories (
-  item_id TEXT NOT NULL,
-  category_id TEXT NOT NULL,
+  item_id INTEGER NOT NULL,
+  category_id INTEGER NOT NULL,
   PRIMARY KEY (item_id, category_id),
   FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
