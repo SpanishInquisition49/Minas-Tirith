@@ -2,7 +2,7 @@ use anyhow::{Context, Ok, Result as AnyhowResult};
 use sqlx::SqlitePool;
 use sqlx::migrate::Migrator;
 
-use crate::schema::item::{DatabaseItem, Item};
+use crate::{metadata::common_metadata::ItemMetadata, schema::item::DatabaseItem};
 
 static MIGRATOR: Migrator = sqlx::migrate!();
 
@@ -29,18 +29,18 @@ impl Archive {
 
     const ADD_ITEM: &str = "
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
 ";
-    pub async fn add_item(&self, item: &Item) -> AnyhowResult<()> {
+    pub async fn add_item<T: ItemMetadata + Sized>(&self, item: &T) -> AnyhowResult<()> {
         sqlx::query(Archive::ADD_ITEM)
-            .bind(&item.title)
-            .bind(&item.description)
-            .bind(&item.r#type)
-            .bind(&item.doi)
-            .bind(&item.isbn)
-            .bind(&item.publication_date)
-            .bind(&item.slug)
-            .bind(&item.cover_image_url)
+            .bind(item.title())
+            .bind(item.description())
+            .bind(item.item_type().to_string())
+            .bind(item.doi())
+            .bind(item.isbn())
+            .bind(item.publication_date())
+            .bind(item.slug())
+            .bind(item.cover_image_url())
             .execute(&self.pool)
             .await
             .context("Creating Item in archive")?;

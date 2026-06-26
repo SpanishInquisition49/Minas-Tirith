@@ -9,8 +9,11 @@ use sqlx::{
 
 use crate::{
     database::archive::Archive,
-    metadata::{openlibrary::OpenLibraryManager, proxy::MetadataFetcher},
-    schema::item::Item,
+    metadata::{
+        crosseref::{CrossrefItem, CrossrefManager},
+        openlibrary::{OpenLibraryItem, OpenLibraryManager},
+        proxy::MetadataFetcher,
+    },
 };
 
 mod database;
@@ -50,18 +53,8 @@ async fn main() -> AnyhowResult<()> {
     let pool = init_db().await.context("Connecting to Database")?;
     let archive = Archive::from_pool(pool);
     archive.migrate().await.context("Running Migrations")?;
-    let openlibrary = OpenLibraryManager::new();
-    let books = openlibrary
-        .fetch("compilers principles, technique & tools")
-        .await?;
-    if !books.is_empty() {
-        let book = books.first().unwrap();
-        let item = Item::from(book);
-        archive
-            .add_item(&item)
-            .await
-            .context("Creating Item in Archive")?;
-    }
+    openlibrary(&archive).await?;
+    crossref(&archive).await?;
     let items = archive
         .get_all_items()
         .await
@@ -72,6 +65,34 @@ async fn main() -> AnyhowResult<()> {
     for item in items {
         println!("========================");
         println!("{item}")
+    }
+    Ok(())
+}
+
+async fn crossref(archive: &Archive) -> AnyhowResult<()> {
+    let crosseref = CrossrefManager::new();
+    let articles = crosseref.fetch("Taming Undefined Behavior in LLVM").await?;
+    if !articles.is_empty() {
+        let article = articles.first().unwrap();
+        archive
+            .add_item::<CrossrefItem>(article)
+            .await
+            .context("Creating Item in Archive")?;
+    }
+    Ok(())
+}
+
+async fn openlibrary(archive: &Archive) -> AnyhowResult<()> {
+    let openlibrary = OpenLibraryManager::new();
+    let books = openlibrary
+        .fetch("compilers principles, technique & tools")
+        .await?;
+    if !books.is_empty() {
+        let book = books.first().unwrap();
+        archive
+            .add_item::<OpenLibraryItem>(book)
+            .await
+            .context("Creating Item in Archive")?;
     }
     Ok(())
 }

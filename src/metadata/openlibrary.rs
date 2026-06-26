@@ -1,6 +1,7 @@
 use anyhow::Context;
 use reqwest::Client;
 use serde::Deserialize;
+use slug::slugify;
 
 use crate::metadata::{
     common_metadata::{ItemMetadata, ItemType},
@@ -27,8 +28,8 @@ pub struct OpenLibraryItem {
 }
 
 impl ItemMetadata for OpenLibraryItem {
-    fn title(&self) -> &str {
-        &self.title
+    fn title(&self) -> String {
+        self.title.clone()
     }
 
     fn item_type(&self) -> ItemType {
@@ -43,15 +44,17 @@ impl ItemMetadata for OpenLibraryItem {
         }
     }
 
-    fn isbn(&self) -> Option<&str> {
+    fn isbn(&self) -> Option<String> {
         if let Some(ia) = &self.ia {
-            ia.iter().find_map(|s| s.strip_prefix("isbn_"))
+            ia.iter()
+                .find_map(|s| s.strip_prefix("isbn_"))
+                .map(|s| s.to_string())
         } else {
             None
         }
     }
 
-    fn doi(&self) -> Option<&str> {
+    fn doi(&self) -> Option<String> {
         None
     }
 
@@ -64,19 +67,27 @@ impl ItemMetadata for OpenLibraryItem {
             .map(|id| format!("https://covers.openlibrary.org/b/id/{id}-L.jpg"))
     }
 
-    fn source(&self) -> &str {
-        "openlibrary"
+    fn source(&self) -> String {
+        "openlibrary".to_string()
     }
 
-    fn source_id(&self) -> Option<&str> {
-        Some(&self.key)
+    fn source_id(&self) -> Option<String> {
+        Some(self.key.clone())
+    }
+
+    fn description(&self) -> Option<String> {
+        None
+    }
+
+    fn slug(&self) -> String {
+        slugify(&self.title)
     }
 }
 
 impl OpenLibraryManager {
     pub fn new() -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: Client::new(),
         }
     }
 }

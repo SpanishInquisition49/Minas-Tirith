@@ -2,7 +2,7 @@ use core::fmt;
 
 use sqlx::types::chrono::{DateTime, Utc};
 
-use crate::metadata::common_metadata::ItemMetadata;
+use crate::metadata::common_metadata::{ItemMetadata, ItemType};
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DatabaseItem {
@@ -36,6 +36,52 @@ pub struct Item {
     pub cover_image_url: Option<String>,
 }
 
+impl ItemMetadata for Item {
+    fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    fn description(&self) -> Option<String> {
+        self.description.clone()
+    }
+
+    fn item_type(&self) -> ItemType {
+        ItemType::try_from(self.r#type.as_str()).unwrap_or(ItemType::Misc)
+    }
+
+    fn authors(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn isbn(&self) -> Option<String> {
+        self.isbn.clone()
+    }
+
+    fn doi(&self) -> Option<String> {
+        self.doi.clone()
+    }
+
+    fn publication_date(&self) -> Option<String> {
+        self.publication_date.clone()
+    }
+
+    fn cover_image_url(&self) -> Option<String> {
+        self.cover_image_url.clone()
+    }
+
+    fn slug(&self) -> String {
+        self.slug.clone()
+    }
+
+    fn source(&self) -> String {
+        "internal".to_string()
+    }
+
+    fn source_id(&self) -> Option<String> {
+        None
+    }
+}
+
 impl fmt::Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
@@ -64,19 +110,14 @@ impl fmt::Display for Item {
 
 impl<T: ItemMetadata + Sized> From<&T> for Item {
     fn from(value: &T) -> Self {
-        let slug = value
-            .title()
-            .replace(",", "")
-            .replace(" ", "-")
-            .to_lowercase();
         Self {
             title: value.title().to_string(),
-            description: None,
+            description: value.description().map(|d| d.to_string()),
             r#type: value.item_type().to_string(),
             doi: value.doi().map(|d| d.to_string()),
             isbn: value.isbn().map(|i| i.to_string()),
             publication_date: value.publication_date(),
-            slug,
+            slug: value.slug(),
             cover_image_url: value.cover_image_url(),
         }
     }

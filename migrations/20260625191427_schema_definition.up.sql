@@ -1,7 +1,7 @@
 -- Add up migration script here
 -- NOTE: Items table
 CREATE TABLE IF NOT EXISTS items (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   description TEXT,
   type TEXT CHECK ( type IN ('book', 'article', 'misc', 'report', 'thesis') ),
@@ -22,7 +22,7 @@ END;
 
 -- NOTE: Authors tables
 CREATE TABLE IF NOT EXISTS authors (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   slug TEXT UNIQUE,
   bio TEXT,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS item_authors (
 
 -- NOTE: Tags tables
 CREATE TABLE IF NOT EXISTS tags (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,
   slug TEXT UNIQUE
 );
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS item_tags (
 
 -- NOTE: Categories tables
 CREATE TABLE IF NOT EXISTS categories (
-  id TEXT PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,
   slug TEXT UNIQUE
 );
