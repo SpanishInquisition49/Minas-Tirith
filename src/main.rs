@@ -75,31 +75,3 @@ async fn main() -> color_eyre::Result<()> {
     ratatui::restore();
     Ok(())
 }
-
-async fn crossref(archive: &Archive) -> color_eyre::Result<()> {
-    let crosseref = CrossrefManager::new();
-    let articles = crosseref.fetch("Taming Undefined Behavior in LLVM").await?;
-    if !articles.is_empty() {
-        let article = articles.first().unwrap();
-        archive
-            .add_item::<CrossrefItem>(article)
-            .await
-            .context("Creating Item in Archive")?;
-    }
-    Ok(())
-}
-
-async fn openlibrary(archive: &Archive) -> color_eyre::Result<()> {
-    let openlibrary = OpenLibraryManager::new();
-    let books = openlibrary.fetch("Engineering a compiler").await?;
-    if !books.is_empty() {
-        let book = books.first().unwrap();
-        archive
-            .add_item::<OpenLibraryItem>(book)
-            .await
-            .context("Creating Item in Archive")?;
-    } else {
-        println!("Book not found");
-    }
-    Ok(())
-}

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use color_eyre::eyre::{Context, eyre};
 use sqlx::Row;
 use sqlx::migrate::Migrator;
@@ -30,12 +32,16 @@ impl Archive {
     }
 
     const ADD_ITEM: &str = "
-INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = excluded.slug RETURNING id
+INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url, path)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = excluded.slug RETURNING id
 ";
     const ADD_AUTHOR: &str = "INSERT INTO authors (name, slug) VALUES (?,?) ON CONFLICT DO UPDATE SET slug = excluded.slug RETURNING id";
     const ADD_ITEM_AUTHOR: &str = "INSERT INTO item_authors (item_id, author_id, author_order) VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
-    pub async fn add_item<T: ItemMetadata + Sized>(&self, item: &T) -> color_eyre::Result<()> {
+    pub async fn add_item<T: ItemMetadata + ?Sized>(
+        &self,
+        item: &T,
+        item_path: &PathBuf,
+    ) -> color_eyre::Result<()> {
         let mut txn = self
             .pool
             .begin()
@@ -52,6 +58,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = excluded
             .bind(item.publication_date())
             .bind(item.slug())
             .bind(item.cover_image_url())
+            .bind(item_path.to_string_lossy())
             .fetch_one(&mut *txn)
             .await;
         if let Err(e) = result {

@@ -32,7 +32,45 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Normal => {}                      // NO additional rendering
         Mode::Insert => draw_add_popup(f, app), // Add item popup
         Mode::Search => todo!(),
+        Mode::MetadataSelect => draw_metadata_select_popup(f, app),
     }
+}
+
+fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
+    let center = f
+        .area()
+        .centered(Constraint::Percentage(60), Constraint::Percentage(40));
+    f.render_widget(Clear, center);
+
+    let items: Vec<ListItem> = app
+        .metadata_candidates
+        .iter()
+        .map(|c| {
+            let authors = c.authors().join(", ");
+            let date = c.publication_date().unwrap_or_default();
+            ListItem::new(format!(
+                "[{}] {}  —  {}  ({})",
+                c.source(),
+                c.title(),
+                authors,
+                date,
+            ))
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_set(border::THICK)
+                .border_style(Style::default().blue())
+                .padding(Padding::uniform(1))
+                .title(Line::from("Select metadata".bold()))
+                .title_bottom(Line::from(" <Enter> Confirm  <Esc> Cancel ").right_aligned()),
+        )
+        .highlight_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
+
+    f.render_stateful_widget(list, center, &mut app.metadata_list_state);
 }
 
 fn draw_add_popup(f: &mut Frame, app: &mut App) {
@@ -50,7 +88,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         .map(|i| ListItem::new(i.fields.title.clone()))
         .collect();
 
-    let index = app.list_state.selected().unwrap_or_default() + 1;
+    let index = app.items_list_state.selected().unwrap_or_default() + 1;
     let total = app.items.len();
     let bottom_line = Line::from(format!(" {index} of {total} "));
     let title = Line::from("Items".bold());
@@ -66,7 +104,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         )
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
 
-    f.render_stateful_widget(list, area, &mut app.list_state);
+    f.render_stateful_widget(list, area, &mut app.items_list_state);
 }
 
 fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {

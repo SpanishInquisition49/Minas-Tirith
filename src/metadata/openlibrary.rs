@@ -100,7 +100,7 @@ impl MetadataFetcher<OpenLibraryItem> for OpenLibraryManager {
         let res = self
             .client
             .get(Self::BASE_URL)
-            .query(&[("title", title), ("limit", "1")])
+            .query(&[("title", title), ("limit", "5")])
             .send()
             .await
             .context("Open Library API call")?;

@@ -7,6 +7,7 @@ use crate::metadata::common_metadata::ItemMetadata;
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DatabaseItem {
     pub id: i32,
+    pub path: String,
     #[sqlx(flatten)]
     pub fields: Item,
     pub created_at: DateTime<Utc>,

@@ -19,13 +19,14 @@ struct CrossrefMessage {
     items: Vec<CrossrefItem>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 pub struct CrossrefItem {
-    #[serde(rename = "DOI")]
+    #[serde(rename = "DOI", default)]
     doi: String,
+    #[serde(default)]
     title: Vec<String>,
     author: Option<Vec<CrossrefAuthor>>,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default)]
     work_type: String,
     issued: Option<CrossrefDate>,
 }
@@ -36,12 +37,11 @@ struct CrossrefAuthor {
     family: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 struct CrossrefDate {
-    #[serde(rename = "date-parts")]
-    date_parts: Vec<Vec<i32>>,
+    #[serde(rename = "date-parts", default)]
+    date_parts: Vec<Vec<Option<i32>>>,
 }
-
 impl ItemMetadata for CrossrefItem {
     fn title(&self) -> String {
         self.title.clone().into_iter().next().unwrap_or_default()
@@ -81,17 +81,15 @@ impl ItemMetadata for CrossrefItem {
     }
 
     fn publication_date(&self) -> Option<String> {
-        if let Some(issued) = &self.issued {
-            issued.date_parts.clone().into_iter().next().map(|parts| {
+        self.issued.as_ref().and_then(|issued| {
+            issued.date_parts.first().map(|parts| {
                 parts
                     .iter()
-                    .map(|p| p.to_string())
+                    .filter_map(|p| p.map(|n| n.to_string()))
                     .collect::<Vec<_>>()
                     .join("-")
             })
-        } else {
-            None
-        }
+        })
     }
 
     fn cover_image_url(&self) -> Option<String> {
@@ -134,12 +132,17 @@ impl MetadataFetcher<CrossrefItem> for CrossrefManager {
         let res = self
             .client
             .get(Self::BASE_URL)
-            .query(&[("query.title", title), ("rows", "1")])
+            .query(&[("query.title", title), ("rows", "5")])
             .send()
             .await
             .context("Crosser API call")?;
         let parsed: CrossrefResponse = res.json().await.context("Crossrer JSON parsing")?;
-        let items = parsed.message.items;
+        let items = parsed
+            .message
+            .items
+            .into_iter()
+            .filter(|i| !i.doi.is_empty() && !i.title.is_empty())
+            .collect();
         Ok(items)
     }
 }

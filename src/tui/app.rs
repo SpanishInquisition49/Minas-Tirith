@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use color_eyre::eyre::Context;
 use ratatui::{
@@ -14,8 +17,8 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use crate::{
     database::archive::Archive,
     metadata::{
-        crosseref::CrossrefManager, image_cache::ImageCache, openlibrary::OpenLibraryManager,
-        proxy::MetadataFetcher,
+        common_metadata::ItemMetadata, crosseref::CrossrefManager, image_cache::ImageCache,
+        openlibrary::OpenLibraryManager, proxy::MetadataFetcher,
     },
     schema::item::DatabaseItem,
 };
@@ -24,19 +27,24 @@ pub enum Mode {
     Normal,
     Insert,
     Search,
+    MetadataSelect,
 }
 
 pub struct App {
     pub archive: Archive,
     pub mode: Mode,
     pub items: Vec<DatabaseItem>,
-    pub list_state: ListState,
+    pub items_list_state: ListState,
     pub search_query: String,
     pub quit: bool,
     pub file_explorer: FileExplorer,
+    // Metadata for new items
+    pub metadata_candidates: Vec<Box<dyn ItemMetadata>>,
+    pub metadata_list_state: ListState,
 
     openlibrary: OpenLibraryManager,
     crossref: CrossrefManager,
+    candidate_path: Option<PathBuf>,
     picker: Picker,
     cache: ImageCache,
     covers: HashMap<i32, StatefulProtocol>,
@@ -86,7 +94,7 @@ impl App {
             file_explorer: explorer,
             mode: Mode::Normal,
             items: Vec::new(),
-            list_state: list,
+            items_list_state: list,
             search_query: String::new(),
             quit: false,
             covers: HashMap::new(),
@@ -95,6 +103,9 @@ impl App {
             image_rx,
             crossref: CrossrefManager::new(),
             openlibrary: OpenLibraryManager::new(),
+            metadata_candidates: Vec::new(),
+            metadata_list_state: ListState::default(),
+            candidate_path: None,
         };
         app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
@@ -102,25 +113,27 @@ impl App {
     }
 
     pub fn select_prev(&mut self) {
-        let i = match self.list_state.selected() {
+        let i = match self.items_list_state.selected() {
             Some(i) if i > 0 => i - 1,
             Some(i) => i,
             None => 0,
         };
-        self.list_state.select(Some(i));
+        self.items_list_state.select(Some(i));
     }
 
     pub fn select_next(&mut self) {
-        let i = match self.list_state.selected() {
+        let i = match self.items_list_state.selected() {
             Some(i) if i + 1 < self.items.len() => i + 1,
             Some(i) => i,
             None => 0,
         };
-        self.list_state.select(Some(i));
+        self.items_list_state.select(Some(i));
     }
 
     pub fn selected_item(&self) -> Option<&DatabaseItem> {
-        self.list_state.selected().and_then(|i| self.items.get(i))
+        self.items_list_state
+            .selected()
+            .and_then(|i| self.items.get(i))
     }
 
     pub fn request_cover_for_selected(&mut self) {
@@ -175,22 +188,87 @@ impl App {
         Ok(())
     }
 
-    pub async fn request_add_file(&mut self) -> color_eyre::Result<()> {
+    pub async fn request_fetch_metadata_candidates(&mut self) -> color_eyre::Result<()> {
         let file = self.file_explorer.current();
         if !file.is_file() {
             return Ok(());
         }
-        let metadata = self.openlibrary.fetch(&file.name).await?;
-        if let Some(item) = metadata.first() {
-            self.archive.add_item(item).await?;
-            return Ok(());
-        }
 
-        let metadata = self.crossref.fetch(&file.name).await?;
-        if let Some(item) = metadata.first() {
-            self.archive.add_item(item).await?;
+        let mut candidates: Vec<Box<dyn ItemMetadata>> = Vec::new();
+
+        let filename = file
+            .path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        let books = self.openlibrary.fetch(&filename).await?;
+        candidates.extend(
+            books
+                .into_iter()
+                .map(|b| Box::new(b) as Box<dyn ItemMetadata>),
+        );
+
+        let articles = self.crossref.fetch(&filename).await?;
+        candidates.extend(
+            articles
+                .into_iter()
+                .map(|a| Box::new(a) as Box<dyn ItemMetadata>),
+        );
+
+        self.metadata_candidates = candidates;
+        self.metadata_list_state = ListState::default();
+        self.candidate_path = Some(file.path.clone());
+
+        if !self.metadata_candidates.is_empty() {
+            self.metadata_list_state.select(Some(0));
+            self.mode = Mode::MetadataSelect;
         }
 
         Ok(())
+    }
+
+    pub fn select_metadata_prev(&mut self) {
+        let i = match self.metadata_list_state.selected() {
+            Some(i) if i > 0 => i - 1,
+            Some(i) => i,
+            None => 0,
+        };
+        self.metadata_list_state.select(Some(i));
+    }
+
+    pub fn select_metadata_next(&mut self) {
+        let i = match self.metadata_list_state.selected() {
+            Some(i) if i + 1 < self.metadata_candidates.len() => i + 1,
+            Some(i) => i,
+            None => 0,
+        };
+        self.metadata_list_state.select(Some(i));
+    }
+
+    pub async fn confirm_metadata_selection(&mut self) -> color_eyre::Result<()> {
+        let Some(index) = self.metadata_list_state.selected() else {
+            return Ok(());
+        };
+        let Some(candidate) = self.metadata_candidates.get(index) else {
+            return Ok(());
+        };
+
+        let Some(candidate_path) = &self.candidate_path else {
+            return Ok(());
+        };
+        self.archive
+            .add_item(candidate.as_ref(), candidate_path)
+            .await?;
+        self.metadata_candidates.clear();
+        self.request_refresh_item_list().await?;
+        self.mode = Mode::Normal;
+        Ok(())
+    }
+
+    pub fn cancel_metadata_selection(&mut self) {
+        self.metadata_candidates.clear();
+        self.mode = Mode::Insert; // torna al file explorer
     }
 }

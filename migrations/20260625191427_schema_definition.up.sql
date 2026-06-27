@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   description TEXT,
+  path TEXT NOT NULL,
   type TEXT CHECK ( type IN ('book', 'article', 'misc', 'report', 'thesis') ),
   doi TEXT,
   isbn TEXT,

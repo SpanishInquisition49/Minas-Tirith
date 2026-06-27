@@ -62,9 +62,15 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             | (KeyModifiers::NONE, KeyCode::Backspace)
             | (KeyModifiers::NONE, KeyCode::Char('q')) => app.mode = Mode::Normal,
             (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
-                app.request_add_file().await?;
-                app.mode = Mode::Normal;
+                app.request_fetch_metadata_candidates().await?;
             }
+            _ => {}
+        },
+        Mode::MetadataSelect => match key.code {
+            KeyCode::Char('j') | KeyCode::Down => app.select_metadata_next(),
+            KeyCode::Char('k') | KeyCode::Up => app.select_metadata_prev(),
+            KeyCode::Enter => app.confirm_metadata_selection().await?,
+            KeyCode::Esc | KeyCode::Char('q') => app.cancel_metadata_selection(),
             _ => {}
         },
         Mode::Search => match key.code {
