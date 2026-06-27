@@ -5,11 +5,12 @@ use ratatui::{
         Direction::{self, Horizontal},
         Layout, Rect,
     },
-    style::{Modifier, Style, Stylize},
+    style::{Modifier, Style, Styled, Stylize},
     symbols::border,
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
+use ratatui_image::StatefulImage;
 
 use crate::tui::app::App;
 
@@ -54,22 +55,89 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, area, &mut app.list_state);
 }
 
-fn draw_details(f: &mut Frame, app: &App, area: Rect) {
-    let text = match app.selected_item() {
-        Some(item) => item.fields.to_string(),
-        None => "No selected item".to_string(),
-    };
+fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let title = Line::from("Details".bold());
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::THICK)
         .title(title);
-    f.render_widget(Paragraph::new(text).block(block), area);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let Some(item) = app.selected_item() else {
+        f.render_widget(Paragraph::new("No selected item"), inner);
+        return;
+    };
+
+    let has_cover_url = item.fields.cover_image_url.is_some();
+    let titles_style = Style::new().bold().dark_gray();
+    let mut card = vec![
+        Line::from(vec![
+            "Title: ".bold().style(titles_style),
+            item.fields.title.to_string().into(),
+        ]),
+        Line::from(vec![
+            "Type: ".bold().style(titles_style),
+            item.fields.r#type.to_string().into(),
+        ]),
+    ];
+    if let Some(date) = item.fields.publication_date.clone() {
+        card.push(Line::from(vec![
+            "Publication Date: ".bold().style(titles_style),
+            date.into(),
+        ]));
+    }
+    if let Some(doi) = item.fields.doi.clone() {
+        card.push(Line::from(vec![
+            "DOI: ".bold().style(titles_style),
+            doi.into(),
+        ]));
+    }
+    if let Some(isbn) = item.fields.isbn.clone() {
+        card.push(Line::from(vec![
+            "ISBN: ".bold().style(titles_style),
+            isbn.into(),
+        ]));
+    }
+
+    let cols = Layout::default()
+        .direction(Horizontal)
+        .constraints([Constraint::Length(24), Constraint::Min(0)])
+        .split(inner);
+
+    draw_cover_slot(f, app, cols[0], has_cover_url);
+    f.render_widget(Paragraph::new(card), cols[1]);
+}
+
+fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool) {
+    let placeholder_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().dim());
+
+    if !has_cover_url {
+        let placeholder = Paragraph::new("📚\nNo cover")
+            .alignment(ratatui::layout::Alignment::Center)
+            .block(placeholder_block);
+        f.render_widget(placeholder, area);
+        return;
+    }
+
+    match app.selected_cover() {
+        Some(protocol) => {
+            f.render_stateful_widget(StatefulImage::default(), area, protocol);
+        }
+        None => {
+            let placeholder = Paragraph::new("Loading…")
+                .alignment(ratatui::layout::Alignment::Center)
+                .block(placeholder_block);
+            f.render_widget(placeholder, area);
+        }
+    }
 }
 
 fn draw_status(f: &mut Frame, area: Rect) {
     let instructions = Line::from(vec![
-        " Naveigate Up ".into(),
+        " Navigate Up ".into(),
         "<K>".blue().bold(),
         " Navigate Down ".into(),
         "<J>".blue().bold(),

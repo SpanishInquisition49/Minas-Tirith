@@ -1,12 +1,16 @@
+use std::time::Duration;
+
 use color_eyre::eyre::eyre;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent};
 use futures::StreamExt;
 use ratatui::{Terminal, backend::Backend};
+use tokio::time::interval;
 
 use crate::tui::{app::App, ui::draw};
 
 pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color_eyre::Result<()> {
     let mut events = EventStream::new();
+    let mut tick = interval(Duration::from_millis(100));
 
     loop {
         // HACK: couldn't hoist the error with the '?' operator
@@ -14,12 +18,21 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
             return Err(eyre!("{e}"));
         }
 
-        if let Some(Ok(Event::Key(key))) = events.next().await {
-            handle_key(app, key).await?;
+        tokio::select! {
+            maybe_event = events.next() => {
+                if let Some(Ok(Event::Key(key))) = maybe_event {
+                    handle_key(app, key).await?;
+                }
+            }
+            _ = tick.tick() => {
+                app.poll_covers();
+            }
         }
 
         if app.quit {
             break;
+        } else {
+            app.request_cover_for_selected();
         }
     }
     Ok(())

@@ -33,8 +33,7 @@ impl Archive {
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = excluded.slug RETURNING id
 ";
-    const ADD_AUTHOR: &str =
-        "INSERT INTO authors (name, slug) VALUES (?,?) ON CONFLICT DO NOTHING RETURNING id";
+    const ADD_AUTHOR: &str = "INSERT INTO authors (name, slug) VALUES (?,?) ON CONFLICT DO UPDATE SET slug = excluded.slug RETURNING id";
     const ADD_ITEM_AUTHOR: &str = "INSERT INTO item_authors (item_id, author_id, author_order) VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
     pub async fn add_item<T: ItemMetadata + Sized>(&self, item: &T) -> color_eyre::Result<()> {
         let mut txn = self
