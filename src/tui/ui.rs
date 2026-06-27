@@ -8,11 +8,11 @@ use ratatui::{
     style::{Modifier, Style, Styled, Stylize},
     symbols::border,
     text::Line,
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph},
 };
 use ratatui_image::StatefulImage;
 
-use crate::tui::app::App;
+use crate::tui::app::{App, Mode};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let outer = Layout::default()
@@ -28,6 +28,19 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     draw_list(f, app, main[0]);
     draw_details(f, app, main[1]);
     draw_status(f, outer[1]);
+    match app.mode {
+        Mode::Normal => {}                      // NO additional rendering
+        Mode::Insert => draw_add_popup(f, app), // Add item popup
+        Mode::Search => todo!(),
+    }
+}
+
+fn draw_add_popup(f: &mut Frame, app: &mut App) {
+    let center = f
+        .area()
+        .centered(Constraint::Percentage(60), Constraint::Percentage(20));
+    f.render_widget(Clear, center);
+    f.render_widget_ref(app.file_explorer.widget(), center);
 }
 
 fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
@@ -47,6 +60,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
                 .borders(Borders::ALL)
                 .border_set(border::THICK)
                 .border_style(Style::default().blue())
+                .padding(Padding::uniform(1))
                 .title(title)
                 .title_bottom(bottom_line.right_aligned()),
         )
@@ -60,6 +74,7 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::THICK)
+        .padding(Padding::uniform(1))
         .title(title);
     let inner = block.inner(area);
     f.render_widget(block, area);
@@ -112,6 +127,7 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
 fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool) {
     let placeholder_block = Block::default()
         .borders(Borders::ALL)
+        .padding(Padding::uniform(1))
         .border_style(Style::default().dim());
 
     if !has_cover_url {
@@ -143,6 +159,8 @@ fn draw_status(f: &mut Frame, area: Rect) {
         "<J>".blue().bold(),
         " Search ".into(),
         "</>".blue().bold(),
+        " Add Item ".into(),
+        "<A>".blue().bold(),
         " Quit ".into(),
         "<Q> ".blue().bold(),
     ]);

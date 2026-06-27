@@ -1,16 +1,28 @@
 use std::collections::{HashMap, HashSet};
 
 use color_eyre::eyre::Context;
-use ratatui::widgets::ListState;
+use ratatui::{
+    style::{Modifier, Style, Stylize},
+    symbols::border,
+    text::Line,
+    widgets::{Block, ListState},
+};
+use ratatui_explorer::{FileExplorer, FileExplorerBuilder, Theme};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::{
-    database::archive::Archive, metadata::image_cache::ImageCache, schema::item::DatabaseItem,
+    database::archive::Archive,
+    metadata::{
+        crosseref::CrossrefManager, image_cache::ImageCache, openlibrary::OpenLibraryManager,
+        proxy::MetadataFetcher,
+    },
+    schema::item::DatabaseItem,
 };
 
 pub enum Mode {
     Normal,
+    Insert,
     Search,
 }
 
@@ -21,7 +33,10 @@ pub struct App {
     pub list_state: ListState,
     pub search_query: String,
     pub quit: bool,
+    pub file_explorer: FileExplorer,
 
+    openlibrary: OpenLibraryManager,
+    crossref: CrossrefManager,
     picker: Picker,
     cache: ImageCache,
     covers: HashMap<i32, StatefulProtocol>,
@@ -36,20 +51,41 @@ impl App {
         picker: Picker,
         cache: ImageCache,
     ) -> color_eyre::Result<Self> {
-        let items = archive.get_all_items().await?;
         let mut list = ListState::default();
-        if !items.is_empty() {
-            list.select_first();
-        }
-
+        let theme = Theme::default()
+            .with_title_top(|_| Line::from(" Add new item ".bold()))
+            .with_title_bottom(|_| {
+                Line::from(vec![" Select: ".into(), "<C-S> ".blue()]).right_aligned()
+            })
+            .with_block(Block::bordered().border_set(border::THICK).blue())
+            .with_highlight_item_style(Style::default().add_modifier(Modifier::REVERSED).yellow())
+            .with_highlight_dir_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
+        let explorer = FileExplorerBuilder::default()
+            .theme(theme)
+            .working_dir(std::env::home_dir().unwrap())
+            .filter_map(|f| {
+                if f.is_dir {
+                    Some(f)
+                } else {
+                    match f.path.extension() {
+                        Some(extension) => match extension.to_str() {
+                            Some("pdf") | Some("epub") => Some(f),
+                            _ => None,
+                        },
+                        None => None,
+                    }
+                }
+            })
+            .build()?;
         let (image_tx, image_rx) = mpsc::unbounded_channel();
 
         let mut app = Self {
             archive,
             picker,
             cache,
+            file_explorer: explorer,
             mode: Mode::Normal,
-            items,
+            items: Vec::new(),
             list_state: list,
             search_query: String::new(),
             quit: false,
@@ -57,7 +93,10 @@ impl App {
             pending_covers: HashSet::new(),
             image_tx,
             image_rx,
+            crossref: CrossrefManager::new(),
+            openlibrary: OpenLibraryManager::new(),
         };
+        app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
         Ok(app)
     }
@@ -129,5 +168,29 @@ impl App {
     pub fn selected_cover(&mut self) -> Option<&mut StatefulProtocol> {
         let id = self.selected_item()?.id;
         self.covers.get_mut(&id)
+    }
+
+    pub async fn request_refresh_item_list(&mut self) -> color_eyre::Result<()> {
+        self.items = self.archive.get_all_items().await?;
+        Ok(())
+    }
+
+    pub async fn request_add_file(&mut self) -> color_eyre::Result<()> {
+        let file = self.file_explorer.current();
+        if !file.is_file() {
+            return Ok(());
+        }
+        let metadata = self.openlibrary.fetch(&file.name).await?;
+        if let Some(item) = metadata.first() {
+            self.archive.add_item(item).await?;
+            return Ok(());
+        }
+
+        let metadata = self.crossref.fetch(&file.name).await?;
+        if let Some(item) = metadata.first() {
+            self.archive.add_item(item).await?;
+        }
+
+        Ok(())
     }
 }
