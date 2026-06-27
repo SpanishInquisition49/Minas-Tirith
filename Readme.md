@@ -1,13 +1,40 @@
 # Minas Tirith
 
-A personal reference manager for books, articles, academic papers, reports, and theses. automatically fetch metadata from external providers (Open Library, Crossref) and organization through authors, tags, and categories.
+A personal reference manager for books, articles, academic papers, reports, and theses, with a terminal user interface.
+Automatically fetches metadata from Open Library and Crossref, and organizes sources through authors, tags, and categories.
 
 ## Features
 
-- 📚 Cataloging of sources of different types
-- 🔍 Automatic metadata lookup by title from external providers (Open Library, with Crossref coming soon)
-- 🗂️ Local storage on SQLite, no external dependencies for saved data
-- 🦀 Written in Rust, using `sqlx` for database access
+- 📚 Cataloguing of sources of different types (books, articles, reports, theses)
+- 🔍 Automatic metadata lookup by title from Open Library and Crossref
+- 🖼️ Cover image display via terminal graphics protocol (Kitty, Sixel, chafa)
+- 📁 Add items by selecting `.pdf` or `.epub` files via a file picker
+
+## Terminal UI
+
+The application presents a two-panel layout:
+
+- **Left panel (35%)**: scrollable list of catalogued items
+- **Right panel (65%)**: detail view showing title, type, date, DOI, ISBN, and cover image
+
+### Keybindings
+
+| Key         | Action                                  |
+| ----------- | --------------------------------------- |
+| `j` / `k`   | Navigate items                          |
+| `a`         | Open file picker to add a new item      |
+| `/`         | Search (stub)                           |
+| `q` / `Esc` | Quit / Cancel / Go back                 |
+| `Ctrl+S`    | Trigger metadata fetch (in file picker) |
+| `Enter`     | Confirm metadata selection              |
+
+### Workflow
+
+1. Press `a` to open the file picker (filtered to `.pdf` and `.epub`)
+2. Navigate to a file and press `Ctrl+S` — the app queries both Open Library and Crossref for matching metadata
+3. Select the correct metadata entry from the popup list
+4. The item is saved to the database and appears in the left panel
+5. Select an item to view its details and cover image
 
 ## Database schema
 
@@ -21,21 +48,10 @@ items ──┬── item_authors ──── authors
 
 Migrations are managed via `sqlx-cli` and live in the `migrations/` folder.
 
-## Metadata providers
-
-The project automatically fetches bibliographic metadata starting from a title, through a common trait (`MetadataFetcher`) implemented by type-specific providers:
-
-| Item type | Provider | Status |
-|---|---|---|
-| `book` | Open Library | ✅ Implemented |
-| `article`, `report`, `thesis` | Crossref | 🚧 Coming soon |
-
-Each provider converts the external API's specific JSON response into a common struct (`ItemMetadata`), so the rest of the application doesn't depend on any provider-specific format.
-
 ### Installation
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:SpanishInquisition49/Minas-Tirith.git
 cd minastirith
 cargo build
 ```
@@ -45,8 +61,8 @@ cargo build
 The SQLite database is automatically created on first run, in a standard OS-dependent path (handled via `directories`):
 
 - **Linux**: `~/.local/share/minastirith/minastirith.db`
-- **macOS**: `~/Library/Application Support/com.yourname.minastirith/minastirith.db`
-- **Windows**: `%APPDATA%\yourname\minastirith\minastirith.db`
+- **macOS**: `~/Library/Application Support/com.TheSpanishInquisition.minastirith/minastirith.db`
+- **Windows**: `%APPDATA%\TheSpanishInquisition\minastirith\minastirith.db`
 
 Migrations are applied automatically at startup via `sqlx::migrate!`.
 
@@ -60,8 +76,10 @@ sqlx migrate run --database-url sqlite://<path-to-db>
 
 - [x] Database schema (items, authors, tags, categories)
 - [x] Metadata provider: Open Library (books)
-- [ ] Metadata provider: Crossref (papers/articles/theses)
-- [ ] User interface
+- [x] Metadata provider: Crossref (papers/articles/theses)
+- [x] Terminal user interface
+- [ ] Tags and categories management in the UI
+- [ ] Search functionality
 - [ ] Bibliography import/export (BibTeX?)
 
 ## License
