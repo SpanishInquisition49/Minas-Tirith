@@ -14,11 +14,13 @@ use crate::{
         openlibrary::{OpenLibraryItem, OpenLibraryManager},
         proxy::MetadataFetcher,
     },
+    tui::{app::App, event::run},
 };
 
 mod database;
 mod metadata;
 mod schema;
+mod tui;
 
 fn get_db_path() -> PathBuf {
     let proj_dirs = ProjectDirs::from("com", "TheSpanishInquisition", "minastirith")
@@ -54,19 +56,11 @@ async fn main() -> color_eyre::Result<()> {
     let pool = init_db().await.context("Connecting to Database")?;
     let archive = Archive::from_pool(pool);
     archive.migrate().await.context("Running Migrations")?;
-    openlibrary(&archive).await?;
-    crossref(&archive).await?;
-    let items = archive
-        .get_all_items()
-        .await
-        .context("Fetching Items from Archive")?;
-    if items.is_empty() {
-        println!("No items fetched");
-    }
-    for item in items {
-        println!("========================");
-        println!("{item}")
-    }
+
+    let mut terminal = ratatui::init();
+    let mut app = App::new(archive).await?;
+    run(&mut terminal, &mut app).await?;
+    ratatui::restore();
     Ok(())
 }
 
