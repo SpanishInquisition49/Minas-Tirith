@@ -51,8 +51,9 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
     match app.mode {
         Mode::Normal => match key.code {
             KeyCode::Char('q') => app.quit = true,
-            KeyCode::Char('j') => app.select_next(),
-            KeyCode::Char('k') => app.select_prev(),
+            KeyCode::Char('j') | KeyCode::Down => app.select_next(),
+            KeyCode::Char('k') | KeyCode::Up => app.select_prev(),
+            KeyCode::Enter => app.request_file_opening()?,
             KeyCode::Char('a') => app.mode = Mode::Insert,
             KeyCode::Char('/') => app.mode = Mode::Search,
             _ => {}
@@ -61,7 +62,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             (KeyModifiers::NONE, KeyCode::Esc)
             | (KeyModifiers::NONE, KeyCode::Backspace)
             | (KeyModifiers::NONE, KeyCode::Char('q')) => app.mode = Mode::Normal,
-            (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
+            (KeyModifiers::NONE, KeyCode::Enter) => {
                 app.request_fetch_metadata_candidates().await?;
             }
             _ => {}

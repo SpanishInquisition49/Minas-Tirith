@@ -35,6 +35,9 @@ impl ImageCache {
     }
 
     pub async fn get_or_download(&self, url: &str) -> color_eyre::Result<PathBuf> {
+        if let Some(local) = url.strip_prefix("file://") {
+            return Ok(PathBuf::from(local));
+        }
         let path = self.cache_path(url);
         if path.exists() {
             return Ok(path);
@@ -54,6 +57,21 @@ impl ImageCache {
         let _ = tokio::fs::write(&path, &bytes)
             .await
             .context("Writing cover image to cache");
+        Ok(path)
+    }
+
+    pub fn generated_prefix(&self, item_id: i32) -> PathBuf {
+        self.cache_path.join(format!("generated-{item_id}"))
+    }
+    pub fn store_generated(
+        &self,
+        item_id: i32,
+        bytes: &[u8],
+        extension: &str,
+    ) -> color_eyre::Result<PathBuf> {
+        let mut path = self.generated_prefix(item_id);
+        path.add_extension(extension);
+        std::fs::write(&path, bytes).context("Writing generated cover to cache")?;
         Ok(path)
     }
 }

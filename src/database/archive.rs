@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use color_eyre::eyre::{Context, eyre};
 use sqlx::Row;
@@ -10,6 +10,7 @@ use crate::{metadata::common_metadata::ItemMetadata, schema::item::DatabaseItem}
 
 static MIGRATOR: Migrator = sqlx::migrate!();
 
+#[derive(Clone, Debug)]
 pub struct Archive {
     pool: SqlitePool,
 }
@@ -40,7 +41,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = exclu
     pub async fn add_item<T: ItemMetadata + ?Sized>(
         &self,
         item: &T,
-        item_path: &PathBuf,
+        item_path: &Path,
     ) -> color_eyre::Result<()> {
         let mut txn = self
             .pool
@@ -103,6 +104,22 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = exclu
         if let Err(e) = txn.commit().await {
             return Err(eyre!("Failed to commit Transaction: {e}"));
         }
+        Ok(())
+    }
+
+    const SET_COVER_IMAGE_URL: &str = "UPDATE items SET cover_image_url = ? WHERE id = ?;";
+
+    pub async fn set_cover_image_url(
+        &self,
+        item_id: i32,
+        cover_url: &str,
+    ) -> color_eyre::Result<()> {
+        sqlx::query(Archive::SET_COVER_IMAGE_URL)
+            .bind(cover_url)
+            .bind(item_id)
+            .execute(&self.pool)
+            .await
+            .context(format!("Update cover url for item {item_id}"))?;
         Ok(())
     }
 }

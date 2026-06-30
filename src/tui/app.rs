@@ -17,8 +17,8 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use crate::{
     database::archive::Archive,
     metadata::{
-        common_metadata::ItemMetadata, crosseref::CrossrefManager, image_cache::ImageCache,
-        openlibrary::OpenLibraryManager, proxy::MetadataFetcher,
+        common_metadata::ItemMetadata, cover_generator::generate_cover, crosseref::CrossrefManager,
+        image_cache::ImageCache, openlibrary::OpenLibraryManager, proxy::MetadataFetcher,
     },
     schema::item::DatabaseItem,
 };
@@ -49,8 +49,8 @@ pub struct App {
     cache: ImageCache,
     covers: HashMap<i32, StatefulProtocol>,
     pending_covers: HashSet<i32>,
-    image_tx: UnboundedSender<(i32, StatefulProtocol)>,
-    image_rx: UnboundedReceiver<(i32, StatefulProtocol)>,
+    image_tx: UnboundedSender<(i32, StatefulProtocol, Option<String>)>,
+    image_rx: UnboundedReceiver<(i32, StatefulProtocol, Option<String>)>,
 }
 
 impl App {
@@ -59,11 +59,11 @@ impl App {
         picker: Picker,
         cache: ImageCache,
     ) -> color_eyre::Result<Self> {
-        let mut list = ListState::default();
+        let list = ListState::default();
         let theme = Theme::default()
             .with_title_top(|_| Line::from(" Add new item ".bold()))
             .with_title_bottom(|_| {
-                Line::from(vec![" Select: ".into(), "<C-S> ".blue()]).right_aligned()
+                Line::from(vec![" Select: ".into(), "<C-Enter> ".blue()]).right_aligned()
             })
             .with_block(Block::bordered().border_set(border::THICK).blue())
             .with_highlight_item_style(Style::default().add_modifier(Modifier::REVERSED).yellow())
@@ -140,16 +140,20 @@ impl App {
         let Some(item) = self.selected_item() else {
             return;
         };
-        let Some(url) = item.fields.cover_image_url.clone() else {
-            return;
-        };
         let id = item.id;
 
         if self.covers.contains_key(&id) || self.pending_covers.contains(&id) {
             return;
         }
-        self.pending_covers.insert(id);
 
+        match item.fields.cover_image_url.clone() {
+            Some(url) => self.spawn_cover_download(id, url),
+            None => self.spawn_cover_generation(id, item.path.clone()),
+        }
+    }
+
+    fn spawn_cover_download(&mut self, id: i32, url: String) {
+        self.pending_covers.insert(id);
         let cache = self.cache.clone();
         let picker = self.picker.clone();
         let tx = self.image_tx.clone();
@@ -166,15 +170,52 @@ impl App {
             .await;
 
             if let Ok(protocol) = result {
-                let _ = tx.send((id, protocol));
+                let _ = tx.send((id, protocol, None));
             }
         });
     }
 
+    fn spawn_cover_generation(&mut self, id: i32, file_path: String) {
+        self.pending_covers.insert(id);
+        let cache = self.cache.clone();
+        let picker = self.picker.clone();
+        let archive = self.archive.clone();
+        let tx = self.image_tx.clone();
+        let path = PathBuf::from(file_path);
+
+        tokio::spawn(async move {
+            let result: color_eyre::Result<(StatefulProtocol, String)> = async {
+                let Some(cover_path) = generate_cover(&path, id, &cache).await? else {
+                    return Err(color_eyre::eyre::eyre!("No cover could be generated"));
+                };
+                let url = format!("file://{}", cover_path.display());
+                archive.set_cover_image_url(id, &url).await?;
+
+                let dyn_image = {
+                    let cover_path = cover_path.clone();
+                    tokio::task::spawn_blocking(move || image::open(&cover_path))
+                        .await
+                        .context("Joining image decode task")?
+                        .context("Decode generated cover image")?
+                };
+                Ok((picker.new_resize_protocol(dyn_image), url))
+            }
+            .await;
+
+            if let Ok((protocol, url)) = result {
+                let _ = tx.send((id, protocol, Some(url)));
+            }
+        });
+    }
     pub fn poll_covers(&mut self) {
-        while let Ok((id, protocol)) = self.image_rx.try_recv() {
+        while let Ok((id, protocol, maybe_url)) = self.image_rx.try_recv() {
             self.pending_covers.remove(&id);
             self.covers.insert(id, protocol);
+            if let Some(url) = maybe_url
+                && let Some(item) = self.items.iter_mut().find(|i| i.id == id)
+            {
+                item.fields.cover_image_url = Some(url);
+            }
         }
     }
 
@@ -185,6 +226,9 @@ impl App {
 
     pub async fn request_refresh_item_list(&mut self) -> color_eyre::Result<()> {
         self.items = self.archive.get_all_items().await?;
+        if !self.items.is_empty() && self.items_list_state.selected().is_none() {
+            self.items_list_state.select(Some(0));
+        }
         Ok(())
     }
 
@@ -270,5 +314,19 @@ impl App {
     pub fn cancel_metadata_selection(&mut self) {
         self.metadata_candidates.clear();
         self.mode = Mode::Insert; // torna al file explorer
+    }
+
+    pub fn request_file_opening(&self) -> color_eyre::Result<()> {
+        let Some(index) = self.items_list_state.selected() else {
+            return Ok(());
+        };
+
+        let Some(item) = self.items.get(index) else {
+            return Ok(());
+        };
+
+        let path = PathBuf::from(&item.path);
+        opener::open(path)?;
+        Ok(())
     }
 }
