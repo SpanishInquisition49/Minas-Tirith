@@ -1,11 +1,7 @@
 use core::fmt;
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 use chrono::{DateTime, Utc};
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
+use ratatui::{style::Style, text::Span};
 
 use crate::schema::graphics::Spannable;
 
@@ -33,5 +29,9 @@ impl Spannable for Author {
     fn to_span(&self) -> Span<'static> {
         let (bg, fg) = Self::tag_colors(&self.slug);
         Span::styled(format!(" {} ", self.name), Style::default().bg(bg).fg(fg))
+    }
+
+    fn span_len(&self) -> usize {
+        self.name.len() + 2
     }
 }

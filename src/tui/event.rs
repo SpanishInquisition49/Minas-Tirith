@@ -8,7 +8,7 @@ use tokio::time::interval;
 
 use crate::tui::{
     app::{App, Mode},
-    ui::draw,
+    ui::ui::draw,
 };
 
 pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color_eyre::Result<()> {

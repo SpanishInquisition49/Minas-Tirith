@@ -10,11 +10,10 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph},
 };
-use ratatui_image::StatefulImage;
 
-use crate::{
-    schema::graphics::Spannable,
-    tui::app::{App, Mode},
+use crate::tui::{
+    app::{App, Mode},
+    ui::details::draw_details,
 };
 
 pub fn draw(f: &mut Frame, app: &mut App) {
@@ -108,112 +107,6 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
 
     f.render_stateful_widget(list, area, &mut app.items_list_state);
-}
-
-fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
-    let title = Line::from("Details".bold());
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_set(border::THICK)
-        .padding(Padding::uniform(1))
-        .title(title);
-    let inner = block.inner(area);
-    f.render_widget(block, area);
-
-    let Some(item) = app.selected_item() else {
-        f.render_widget(Paragraph::new("No selected item"), inner);
-        return;
-    };
-
-    let has_cover_url = item.fields.cover_image_url.is_some();
-    let titles_style = Style::new().bold().dark_gray();
-    let mut card = vec![
-        Line::from(vec![
-            "Title: ".bold().style(titles_style),
-            item.fields.title.to_string().into(),
-        ]),
-        Line::from(vec![
-            "Type: ".bold().style(titles_style),
-            item.fields.r#type.to_string().into(),
-        ]),
-    ];
-    card.push(Line::from("Authors:\n".bold().style(titles_style)));
-    let mut authors: Vec<Span> = Vec::new();
-    for author in &item.authors {
-        authors.push(author.to_span());
-        authors.push(Span::raw(" "));
-    }
-    card.push(Line::from(authors));
-    if let Some(date) = item.fields.publication_date.clone() {
-        card.push(Line::from(vec![
-            "Publication Date: ".bold().style(titles_style),
-            date.into(),
-        ]));
-    }
-    if let Some(doi) = item.fields.doi.clone() {
-        card.push(Line::from(vec![
-            "DOI: ".bold().style(titles_style),
-            doi.into(),
-        ]));
-    }
-    if let Some(isbn) = item.fields.isbn.clone() {
-        card.push(Line::from(vec![
-            "ISBN: ".bold().style(titles_style),
-            isbn.into(),
-        ]));
-    }
-
-    if !item.tags.is_empty() {
-        let mut tags: Vec<Span> = Vec::new();
-        card.push(Line::from("Tags: ".bold().style(titles_style)));
-        for tag in &item.tags {
-            tags.push(tag.to_span());
-            tags.push(Span::raw(" "));
-        }
-        card.push(Line::from(tags));
-    }
-
-    let cols = Layout::default()
-        .direction(Horizontal)
-        .constraints([Constraint::Length(24), Constraint::Min(0)])
-        .spacing(2)
-        .split(inner);
-
-    draw_cover_slot(f, app, cols[0], has_cover_url);
-    f.render_widget(Paragraph::new(card), cols[1]);
-}
-
-fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool) {
-    let cover_area = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(22), Constraint::Min(0)])
-        .split(area)[0];
-
-    let placeholder_block = Block::default()
-        .borders(Borders::ALL)
-        .padding(Padding::uniform(1))
-        .border_style(Style::default().dim());
-
-    if !has_cover_url {
-        let placeholder = Paragraph::new(" \nNo cover")
-            .alignment(ratatui::layout::Alignment::Center)
-            .block(placeholder_block);
-        f.render_widget(placeholder, cover_area);
-        return;
-    }
-
-    match app.selected_cover() {
-        Some(protocol) => {
-            // Resize::Fit(None) è già il default: preserva aspect ratio
-            f.render_stateful_widget(StatefulImage::default(), cover_area, protocol);
-        }
-        None => {
-            let placeholder = Paragraph::new("Loading…")
-                .alignment(ratatui::layout::Alignment::Center)
-                .block(placeholder_block);
-            f.render_widget(placeholder, cover_area);
-        }
-    }
 }
 
 fn draw_status(f: &mut Frame, area: Rect) {

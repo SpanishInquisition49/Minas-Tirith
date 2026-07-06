@@ -1,9 +1,4 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
+use ratatui::{style::Style, text::Span};
 
 use crate::schema::graphics::Spannable;
 
@@ -17,9 +12,10 @@ pub struct Tag {
 impl Spannable for Tag {
     fn to_span(&self) -> Span<'static> {
         let (bg, fg) = Self::tag_colors(&self.slug);
-        Span::styled(
-            format!(" {} ", self.name.clone()),
-            Style::default().bg(bg).fg(fg),
-        )
+        Span::styled(format!(" {} ", self.name), Style::default().bg(bg).fg(fg))
+    }
+
+    fn span_len(&self) -> usize {
+        self.name.len() + 2
     }
 }

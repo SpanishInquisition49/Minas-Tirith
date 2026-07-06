@@ -4,6 +4,7 @@ use ratatui::{style::Color, text::Span};
 
 pub trait Spannable {
     fn to_span(&self) -> Span<'static>;
+    fn span_len(&self) -> usize;
 
     fn tag_colors(slug: &str) -> (Color, Color) {
         let mut hasher = DefaultHasher::new();
