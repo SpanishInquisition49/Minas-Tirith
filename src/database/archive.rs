@@ -173,22 +173,22 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = exclu
         Ok(())
     }
 
-    pub async fn save_item_from_form(
+    pub async fn save_item_from_form<T: ItemMetadata + ?Sized>(
         &self,
-        form: &MetadataForm,
+        form: &T,
         item_path: &Path,
     ) -> color_eyre::Result<()> {
         let mut txn = self.pool.begin().await.context("Begin item insertion")?;
 
         let result: Result<SqliteRow, sqlx::Error> = sqlx::query(Archive::ADD_ITEM)
-            .bind(&form.title)
-            .bind(form.description_opt())
-            .bind(form.item_type.to_string())
-            .bind(form.doi_opt())
-            .bind(form.isbn_opt())
-            .bind(form.publication_date_opt())
-            .bind(slugify(&form.title))
-            .bind(&form.cover_image_url)
+            .bind(form.title())
+            .bind(form.description())
+            .bind(form.item_type().to_string())
+            .bind(form.doi())
+            .bind(form.isbn())
+            .bind(form.publication_date())
+            .bind(form.slug())
+            .bind(form.cover_image_url())
             .bind(item_path.to_string_lossy())
             .fetch_one(&mut *txn)
             .await;
@@ -201,7 +201,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = exclu
             }
         };
 
-        for (index, author) in form.authors.iter().enumerate() {
+        for (index, author) in form.authors().iter().enumerate() {
             let row: SqliteRow = sqlx::query(Archive::ADD_AUTHOR)
                 .bind(author)
                 .bind(slugify(author))
@@ -218,7 +218,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = exclu
                 .context("Linking item-author")?;
         }
 
-        Self::sync_tags(&mut txn, item_id, &form.tags_vec()).await?;
+        Self::sync_tags(&mut txn, item_id, &form.tags()).await?;
 
         txn.commit().await.context("Commit item insertion")?;
 
@@ -232,22 +232,22 @@ SET title = ?, description = ?, type = ?, doi = ?, isbn = ?, publication_date = 
 WHERE id = ?
 ";
 
-    pub async fn update_item_from_form(
+    pub async fn update_item_from_form<T: ItemMetadata + ?Sized>(
         &self,
         item_id: i32,
-        form: &crate::schema::form::MetadataForm,
+        form: &T,
     ) -> color_eyre::Result<()> {
         let mut txn = self.pool.begin().await.context("Begin item update")?;
 
         let result = sqlx::query(Archive::UPDATE_ITEM_METADATA)
-            .bind(&form.title)
-            .bind(form.description_opt())
-            .bind(form.item_type.to_string())
-            .bind(form.doi_opt())
-            .bind(form.isbn_opt())
-            .bind(form.publication_date_opt())
-            .bind(slug::slugify(&form.title))
-            .bind(&form.cover_image_url)
+            .bind(form.title())
+            .bind(form.description())
+            .bind(form.item_type().to_string())
+            .bind(form.doi())
+            .bind(form.isbn())
+            .bind(form.publication_date())
+            .bind(form.slug())
+            .bind(form.cover_image_url())
             .bind(item_id)
             .execute(&mut *txn)
             .await
@@ -264,7 +264,7 @@ WHERE id = ?
             .await
             .context("Clearing item tags")?;
 
-        Self::sync_tags(&mut txn, item_id, &form.tags_vec()).await?;
+        Self::sync_tags(&mut txn, item_id, &form.tags()).await?;
 
         txn.commit().await.context("Commit item update")?;
         Ok(())

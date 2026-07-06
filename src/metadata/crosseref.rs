@@ -111,6 +111,10 @@ impl ItemMetadata for CrossrefItem {
     fn slug(&self) -> String {
         slugify(self.title())
     }
+
+    fn tags(&self) -> Vec<String> {
+        vec![]
+    }
 }
 
 pub struct CrossrefManager {

@@ -1,8 +1,8 @@
 use ratatui::{
     Frame,
-    layout::Constraint,
+    layout::{Constraint, Direction, Layout},
     style::{Modifier, Style, Stylize},
-    symbols::{self, border},
+    symbols::border,
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Padding, Paragraph},
 };
@@ -21,7 +21,7 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
 
     let title = if app.saving {
         let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-        let frame = spinner[(app.tick_counter as usize) % spinner.len()];
+        let frame = spinner[app.tick_counter % spinner.len()];
         Line::from(format!(" {frame} Saving... ").bold())
     } else {
         Line::from(" Edit metadata ".bold())
@@ -39,6 +39,19 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         );
 
     let inner = block.inner(center);
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Ratio(1, 7),
+            Constraint::Ratio(1, 7),
+            Constraint::Ratio(1, 7),
+            Constraint::Ratio(1, 7),
+            Constraint::Ratio(1, 7),
+            Constraint::Ratio(1, 7),
+            Constraint::Ratio(1, 7),
+        ])
+        .split(inner);
     f.render_widget(block, center);
 
     let mut lines: Vec<Line> = Vec::new();
@@ -55,19 +68,41 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     ]));
     lines.push(Line::raw(""));
     for (i, label) in FIELD_LABELS.iter().enumerate() {
+        let width = rows[i].width.max(3) - 3;
+        let scroll = match i {
+            0 => form.title.visual_scroll(width as usize),
+            1 => form.description.visual_scroll(width as usize),
+            2 => form.doi.visual_scroll(width as usize),
+            3 => form.isbn.visual_scroll(width as usize),
+            4 => form.publication_date.visual_scroll(width as usize),
+            5 => form.tags.visual_scroll(width as usize),
+            _ => unreachable!(),
+        };
         let value = form.field_value(i);
-        let is_selected = i == form.filed_index;
-        let prefix = if is_selected { "> " } else { "  " };
+        let is_selected = i == form.field_index;
         let style = if is_selected {
-            Style::default().add_modifier(Modifier::REVERSED).yellow()
+            Style::default().yellow()
         } else {
             Style::default()
         };
-        let suffix = if is_selected && form.editing { "|" } else { "" };
-        lines.push(Line::from(Span::styled(
-            format!("{prefix}{label}: {value}{suffix}"),
-            style,
-        )));
+
+        let input = Paragraph::new(value)
+            .style(style)
+            .scroll((0, scroll as u16))
+            .block(Block::bordered().title(format!(" {label} ")));
+        f.render_widget(input, rows[i]);
+        if form.editing && is_selected {
+            let x = match i {
+                0 => form.title.visual_cursor().max(scroll) - scroll + 1,
+                1 => form.description.visual_cursor().max(scroll) - scroll + 1,
+                2 => form.doi.visual_cursor().max(scroll) - scroll + 1,
+                3 => form.isbn.visual_cursor().max(scroll) - scroll + 1,
+                4 => form.publication_date.visual_cursor().max(scroll) - scroll + 1,
+                5 => form.tags.visual_cursor().max(scroll) - scroll + 1,
+                _ => unreachable!(),
+            };
+            f.set_cursor_position((rows[i].x + x as u16, rows[i].y + 1))
+        }
     }
-    f.render_widget(Paragraph::new(lines), inner);
+    f.render_widget(Paragraph::new(lines), rows[6]);
 }

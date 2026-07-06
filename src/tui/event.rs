@@ -27,6 +27,9 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
                     if let Mode::Insert = app.mode {
                         app.file_explorer.handle(&event)?;
                     };
+                    if let Mode::MetadataEdit = app.mode && let Some(form) = &mut app.metadata_form && form.editing {
+                        form.handle_event(&event);
+                    }
                     if let Event::Key(key) = event {
                         handle_key(app, key).await?;
                     }
@@ -93,12 +96,6 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                 };
                 match key.code {
                     KeyCode::Enter | KeyCode::Esc => form.editing = false,
-                    KeyCode::Backspace => {
-                        form.current_field_mut().pop();
-                    }
-                    KeyCode::Char(c) => {
-                        form.current_field_mut().push(c);
-                    }
                     _ => {}
                 }
             } else {

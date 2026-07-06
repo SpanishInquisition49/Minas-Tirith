@@ -15,6 +15,7 @@ pub trait ItemMetadata {
     fn slug(&self) -> String;
     fn source(&self) -> String;
     fn source_id(&self) -> Option<String>;
+    fn tags(&self) -> Vec<String>;
 }
 
 #[derive(Debug, Clone)]

@@ -83,6 +83,10 @@ impl ItemMetadata for OpenLibraryItem {
     fn slug(&self) -> String {
         slugify(&self.title)
     }
+
+    fn tags(&self) -> Vec<String> {
+        vec![]
+    }
 }
 
 impl OpenLibraryManager {
