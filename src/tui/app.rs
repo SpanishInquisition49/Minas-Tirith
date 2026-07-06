@@ -20,7 +20,7 @@ use crate::{
         common_metadata::ItemMetadata, cover_generator::generate_cover, crosseref::CrossrefManager,
         image_cache::ImageCache, openlibrary::OpenLibraryManager, proxy::MetadataFetcher,
     },
-    schema::item::DatabaseItem,
+    schema::{form::MetadataForm, item::DatabaseItem},
 };
 
 pub enum Mode {
@@ -28,6 +28,17 @@ pub enum Mode {
     Insert,
     Search,
     MetadataSelect,
+    MetadataEdit,
+}
+
+pub enum EditContext {
+    NewItem { path: PathBuf },
+    ExistingItem { id: i32 },
+}
+
+pub enum SaveOutcome {
+    Saved,
+    Failed(String),
 }
 
 pub struct App {
@@ -41,6 +52,13 @@ pub struct App {
     // Metadata for new items
     pub metadata_candidates: Vec<Box<dyn ItemMetadata>>,
     pub metadata_list_state: ListState,
+    pub metadata_form: Option<MetadataForm>,
+    pub edit_context: Option<EditContext>,
+    pub saving: bool,
+    pub last_error: Option<String>,
+    pub tick_counter: usize,
+    save_tx: UnboundedSender<SaveOutcome>,
+    save_rx: UnboundedReceiver<SaveOutcome>,
 
     openlibrary: OpenLibraryManager,
     crossref: CrossrefManager,
@@ -86,6 +104,7 @@ impl App {
             })
             .build()?;
         let (image_tx, image_rx) = mpsc::unbounded_channel();
+        let (save_tx, save_rx) = mpsc::unbounded_channel();
 
         let mut app = Self {
             archive,
@@ -106,6 +125,13 @@ impl App {
             metadata_candidates: Vec::new(),
             metadata_list_state: ListState::default(),
             candidate_path: None,
+            metadata_form: None,
+            edit_context: None,
+            saving: false,
+            last_error: None,
+            save_tx,
+            save_rx,
+            tick_counter: 0,
         };
         app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
@@ -291,24 +317,79 @@ impl App {
         self.metadata_list_state.select(Some(i));
     }
 
-    pub async fn confirm_metadata_selection(&mut self) -> color_eyre::Result<()> {
+    pub fn open_metadata_edit_for_candidate(&mut self) {
         let Some(index) = self.metadata_list_state.selected() else {
-            return Ok(());
+            return;
         };
         let Some(candidate) = self.metadata_candidates.get(index) else {
-            return Ok(());
+            return;
+        };
+        let Some(path) = self.candidate_path.clone() else {
+            return;
         };
 
-        let Some(candidate_path) = &self.candidate_path else {
-            return Ok(());
+        self.metadata_form = Some(MetadataForm::from_candidate(candidate.as_ref()));
+        self.edit_context = Some(EditContext::NewItem { path });
+        self.mode = Mode::MetadataEdit;
+    }
+
+    pub fn open_metadata_edit_for_selected_item(&mut self) {
+        let Some(item) = self.selected_item() else {
+            return;
         };
-        self.archive
-            .add_item(candidate.as_ref(), candidate_path)
-            .await?;
-        self.metadata_candidates.clear();
-        self.request_refresh_item_list().await?;
-        self.mode = Mode::Normal;
+        let form = MetadataForm::from_item(item);
+        let id = item.id;
+
+        self.metadata_form = Some(form);
+        self.edit_context = Some(EditContext::ExistingItem { id });
+        self.mode = Mode::MetadataEdit;
+    }
+
+    pub fn confirm_metadata_form(&mut self) {
+        let Some(form) = self.metadata_form.take() else {
+            return;
+        };
+        let Some(ctx) = self.edit_context.take() else {
+            return;
+        };
+
+        self.saving = true;
+        self.last_error = None;
+        let archive = self.archive.clone();
+        let tx = self.save_tx.clone();
+
+        tokio::spawn(async move {
+            let result = match ctx {
+                EditContext::NewItem { path } => archive.save_item_from_form(&form, &path).await,
+                EditContext::ExistingItem { id } => archive.update_item_from_form(id, &form).await,
+            };
+            let outcome = match result {
+                Ok(()) => SaveOutcome::Saved,
+                Err(e) => SaveOutcome::Failed(e.to_string()),
+            };
+            let _ = tx.send(outcome);
+        });
+    }
+
+    pub async fn poll_save(&mut self) -> color_eyre::Result<()> {
+        while let Ok(outcome) = self.save_rx.try_recv() {
+            self.saving = false;
+            match outcome {
+                SaveOutcome::Saved => {
+                    self.mode = Mode::Normal;
+                    self.metadata_candidates.clear();
+                    self.request_refresh_item_list().await?;
+                }
+                SaveOutcome::Failed(err) => self.last_error = Some(err),
+            }
+        }
         Ok(())
+    }
+
+    pub fn cancel_metadata_form(&mut self) {
+        self.metadata_form = None;
+        self.edit_context = None;
+        self.mode = Mode::Normal;
     }
 
     pub fn cancel_metadata_selection(&mut self) {

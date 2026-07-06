@@ -2,7 +2,7 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Style, Stylize},
-    symbols::border,
+    symbols::{self, border},
     text::{Line, Span},
     widgets::{Block, Borders, Padding, Paragraph},
 };
@@ -45,7 +45,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         ]),
     ];
     card.push(Line::from(Span::styled(
-        "·".repeat(text_width as usize),
+        symbols::DOT.repeat(text_width as usize),
         Style::default().dim(),
     )));
     card.push(Line::from("Authors:\n".bold().style(titles_style)));
@@ -56,7 +56,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         .collect();
     card.extend(wrap_pills(authors_pills, text_width));
     card.push(Line::from(Span::styled(
-        "·".repeat(text_width as usize),
+        symbols::DOT.repeat(text_width as usize),
         Style::default().dim(),
     )));
     if let Some(date) = item.fields.publication_date.clone() {

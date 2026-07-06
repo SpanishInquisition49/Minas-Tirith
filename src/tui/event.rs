@@ -8,7 +8,7 @@ use tokio::time::interval;
 
 use crate::tui::{
     app::{App, Mode},
-    ui::ui::draw,
+    ui::base::draw,
 };
 
 pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color_eyre::Result<()> {
@@ -34,6 +34,7 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
             }
             _ = tick.tick() => {
                 app.poll_covers();
+                app.poll_save().await?;
             }
         }
 
@@ -54,6 +55,9 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             KeyCode::Char('k') | KeyCode::Up => app.select_prev(),
             KeyCode::Enter => app.request_file_opening()?,
             KeyCode::Char('a') => app.mode = Mode::Insert,
+            KeyCode::Char('e') => {
+                app.open_metadata_edit_for_selected_item();
+            }
             KeyCode::Char('/') => app.mode = Mode::Search,
             _ => {}
         },
@@ -69,7 +73,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
         Mode::MetadataSelect => match key.code {
             KeyCode::Char('j') | KeyCode::Down => app.select_metadata_next(),
             KeyCode::Char('k') | KeyCode::Up => app.select_metadata_prev(),
-            KeyCode::Enter => app.confirm_metadata_selection().await?,
+            KeyCode::Enter => app.open_metadata_edit_for_candidate(),
             KeyCode::Esc | KeyCode::Char('q') => app.cancel_metadata_selection(),
             _ => {}
         },
@@ -77,6 +81,57 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             KeyCode::Esc | KeyCode::Backspace | KeyCode::Char('q') => app.mode = Mode::Normal,
             _ => {}
         },
+        Mode::MetadataEdit => {
+            let editing = app
+                .metadata_form
+                .as_ref()
+                .map(|f| f.editing)
+                .unwrap_or(false);
+            if editing {
+                let Some(form) = app.metadata_form.as_mut() else {
+                    return Ok(());
+                };
+                match key.code {
+                    KeyCode::Enter | KeyCode::Esc => form.editing = false,
+                    KeyCode::Backspace => {
+                        form.current_field_mut().pop();
+                    }
+                    KeyCode::Char(c) => {
+                        form.current_field_mut().push(c);
+                    }
+                    _ => {}
+                }
+            } else {
+                match (key.modifiers, key.code) {
+                    (KeyModifiers::CONTROL, KeyCode::Char('s')) => app.confirm_metadata_form(),
+
+                    (_, KeyCode::Char('j')) | (_, KeyCode::Down) => {
+                        if let Some(f) = app.metadata_form.as_mut() {
+                            f.next_field();
+                        }
+                    }
+                    (_, KeyCode::Char('k')) | (_, KeyCode::Up) => {
+                        if let Some(f) = app.metadata_form.as_mut() {
+                            f.prev_field();
+                        }
+                    }
+                    (_, KeyCode::Char('t')) => {
+                        if let Some(f) = app.metadata_form.as_mut() {
+                            f.cycle_item_type();
+                        }
+                    }
+                    (_, KeyCode::Enter) => {
+                        if let Some(f) = app.metadata_form.as_mut() {
+                            f.editing = true;
+                        }
+                    }
+                    (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => {
+                        app.cancel_metadata_form();
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
     Ok(())
 }

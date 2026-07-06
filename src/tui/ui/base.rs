@@ -13,7 +13,7 @@ use ratatui::{
 
 use crate::tui::{
     app::{App, Mode},
-    ui::details::draw_details,
+    ui::{details::draw_details, form::draw_metadata_edit_popup},
 };
 
 pub fn draw(f: &mut Frame, app: &mut App) {
@@ -35,6 +35,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Insert => draw_add_popup(f, app), // Add item popup
         Mode::Search => todo!(),
         Mode::MetadataSelect => draw_metadata_select_popup(f, app),
+        Mode::MetadataEdit => draw_metadata_edit_popup(f, app),
     }
 }
 
@@ -119,6 +120,8 @@ fn draw_status(f: &mut Frame, area: Rect) {
         "</>".blue().bold(),
         " Add Tome ".into(),
         "<A>".blue().bold(),
+        " Edit Tome ".into(),
+        "<E>".blue().bold(),
         " Quit ".into(),
         "<Q> ".blue().bold(),
     ]);

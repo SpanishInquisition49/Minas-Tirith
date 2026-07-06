@@ -1,11 +1,13 @@
 use std::path::Path;
 
 use color_eyre::eyre::{Context, eyre};
+use slug::slugify;
 use sqlx::Row;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqliteQueryResult;
 use sqlx::{SqlitePool, sqlite::SqliteRow};
 
+use crate::schema::form::MetadataForm;
 use crate::{metadata::common_metadata::ItemMetadata, schema::item::DatabaseItem};
 
 static MIGRATOR: Migrator = sqlx::migrate!();
@@ -141,6 +143,130 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = exclu
             .execute(&self.pool)
             .await
             .context(format!("Update cover url for item {item_id}"))?;
+        Ok(())
+    }
+
+    const ADD_TAG: &str = "INSERT INTO tags (name, slug) VALUES (?,?) ON CONFLICT DO UPDATE SET slug = excluded.slug RETURNING id";
+    const ADD_ITEM_TAG: &str =
+        "INSERT INTO item_tags (item_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
+    async fn sync_tags(
+        txn: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+        item_id: i32,
+        tags: &[String],
+    ) -> color_eyre::Result<()> {
+        for tag in tags {
+            let row: SqliteRow = sqlx::query(Archive::ADD_TAG)
+                .bind(tag)
+                .bind(slugify(tag))
+                .fetch_one(&mut **txn)
+                .await
+                .context("Upserting tag")?;
+
+            let tag_id: i32 = row.get("id");
+            sqlx::query(Archive::ADD_ITEM_TAG)
+                .bind(item_id)
+                .bind(tag_id)
+                .execute(&mut **txn)
+                .await
+                .context("Linking item-tag")?;
+        }
+        Ok(())
+    }
+
+    pub async fn save_item_from_form(
+        &self,
+        form: &MetadataForm,
+        item_path: &Path,
+    ) -> color_eyre::Result<()> {
+        let mut txn = self.pool.begin().await.context("Begin item insertion")?;
+
+        let result: Result<SqliteRow, sqlx::Error> = sqlx::query(Archive::ADD_ITEM)
+            .bind(&form.title)
+            .bind(form.description_opt())
+            .bind(form.item_type.to_string())
+            .bind(form.doi_opt())
+            .bind(form.isbn_opt())
+            .bind(form.publication_date_opt())
+            .bind(slugify(&form.title))
+            .bind(&form.cover_image_url)
+            .bind(item_path.to_string_lossy())
+            .fetch_one(&mut *txn)
+            .await;
+
+        let item_id: i32 = match result {
+            Ok(row) => row.get("id"),
+            Err(e) => {
+                txn.rollback().await.ok();
+                return Err(eyre!("Failed to create Item: {e}"));
+            }
+        };
+
+        for (index, author) in form.authors.iter().enumerate() {
+            let row: SqliteRow = sqlx::query(Archive::ADD_AUTHOR)
+                .bind(author)
+                .bind(slugify(author))
+                .fetch_one(&mut *txn)
+                .await
+                .context("Upserting author")?;
+            let author_id: i32 = row.get("id");
+            sqlx::query(Archive::ADD_ITEM_AUTHOR)
+                .bind(item_id)
+                .bind(author_id)
+                .bind(index as i32)
+                .execute(&mut *txn)
+                .await
+                .context("Linking item-author")?;
+        }
+
+        Self::sync_tags(&mut txn, item_id, &form.tags_vec()).await?;
+
+        txn.commit().await.context("Commit item insertion")?;
+
+        Ok(())
+    }
+
+    const CLEAR_ITEM_TAGS: &str = "DELETE FROM item_tags WHERE item_id = ?";
+    const UPDATE_ITEM_METADATA: &str = "
+UPDATE items
+SET title = ?, description = ?, type = ?, doi = ?, isbn = ?, publication_date = ?, slug = ?, cover_image_url = ?
+WHERE id = ?
+";
+
+    pub async fn update_item_from_form(
+        &self,
+        item_id: i32,
+        form: &crate::schema::form::MetadataForm,
+    ) -> color_eyre::Result<()> {
+        let mut txn = self.pool.begin().await.context("Begin item update")?;
+
+        let result = sqlx::query(Archive::UPDATE_ITEM_METADATA)
+            .bind(&form.title)
+            .bind(form.description_opt())
+            .bind(form.item_type.to_string())
+            .bind(form.doi_opt())
+            .bind(form.isbn_opt())
+            .bind(form.publication_date_opt())
+            .bind(slug::slugify(&form.title))
+            .bind(&form.cover_image_url)
+            .bind(item_id)
+            .execute(&mut *txn)
+            .await
+            .context("Updating item metadata")?;
+
+        if result.rows_affected() == 0 {
+            txn.rollback().await.ok();
+            return Err(eyre!("No item with id {item_id} found to update"));
+        }
+
+        sqlx::query(Archive::CLEAR_ITEM_TAGS)
+            .bind(item_id)
+            .execute(&mut *txn)
+            .await
+            .context("Clearing item tags")?;
+
+        Self::sync_tags(&mut txn, item_id, &form.tags_vec()).await?;
+
+        txn.commit().await.context("Commit item update")?;
         Ok(())
     }
 }
