@@ -1,44 +1,101 @@
 # Minas Tirith
 
-A personal reference manager for books, articles, academic papers, reports, and theses, with a terminal user interface.
-Automatically fetches metadata from Open Library and Crossref, and organizes sources through authors, tags, and categories.
+Minas Tirith is a terminal-first personal reference manager for books, articles, reports, theses, and miscellaneous documents.
 
-## Features
+It stores metadata in SQLite, fetches candidates from Open Library and Crossref, lets you review/edit metadata before saving, and shows document covers directly in the TUI.
 
-- 📚 Cataloguing of sources of different types (books, articles, reports, theses)
-- 🔍 Automatic metadata lookup by title from Open Library and Crossref
-- 🖼️ Cover image display via terminal graphics protocol (Kitty, Sixel, chafa)
-- 📁 Add items by selecting `.pdf` or `.epub` files via a file picker
+## Current capabilities
 
-## Terminal UI
+- Add references by choosing a local `.pdf` or `.epub` file from an in-app file explorer
+- Fetch metadata candidates from:
+  - Open Library (`title`, authors, year, ISBN when available, cover URL)
+  - Crossref (`title`, authors, DOI, publication date, inferred item type)
+- Select a candidate, edit metadata, and save to the archive
+- Edit metadata for already-saved publications
+- Open a saved file from the list
+- Display cached/downloaded covers, or generate covers from local files:
+  - PDF: first page via `pdftoppm`
+  - EPUB: embedded cover via `epub` crate
+- Persist items, authors, and tags in SQLite through SQLx migrations
 
-The application presents a two-panel layout:
+## Keybindings
 
-- **Left panel (35%)**: scrollable list of catalogued items
-- **Right panel (65%)**: detail view showing title, type, date, DOI, ISBN, and cover image
+### Normal mode
 
-### Keybindings
+| Key          | Action                                    |
+| ------------ | ----------------------------------------- |
+| `j` / `Down` | Select next item                          |
+| `k` / `Up`   | Select previous item                      |
+| `a`          | Open file explorer (add flow)             |
+| `e`          | Edit selected item metadata               |
+| `Enter`      | Open selected file with system opener     |
+| `/`          | Enter search mode (currently placeholder) |
+| `q`          | Quit                                      |
 
-| Key         | Action                                  |
-| ----------- | --------------------------------------- |
-| `j` / `k`   | Navigate items                          |
-| `a`         | Open file picker to add a new item      |
-| `/`         | Search (stub)                           |
-| `q` / `Esc` | Quit / Cancel / Go back                 |
-| `Ctrl+S`    | Trigger metadata fetch (in file picker) |
-| `Enter`     | Confirm metadata selection              |
+### Insert mode (file explorer)
 
-### Workflow
+| Key                       | Action                                     |
+| ------------------------- | ------------------------------------------ |
+| `a`                       | Fetch metadata candidates for current file |
+| `Esc` / `Backspace` / `q` | Return to normal mode                      |
 
-1. Press `a` to open the file picker (filtered to `.pdf` and `.epub`)
-2. Navigate to a file and press `Ctrl+S` — the app queries both Open Library and Crossref for matching metadata
-3. Select the correct metadata entry from the popup list
-4. The item is saved to the database and appears in the left panel
-5. Select an item to view its details and cover image
+### Metadata selection popup
 
-## Database schema
+| Key          | Action                  |
+| ------------ | ----------------------- |
+| `j` / `Down` | Next candidate          |
+| `k` / `Up`   | Previous candidate      |
+| `Enter`      | Open metadata edit form |
+| `Esc` / `q`  | Cancel                  |
 
-The database is organized around the `items` table, with many-to-many relationships toward `authors`, `tags`, and `categories`:
+### Metadata edit popup
+
+| Key          | Action                      |
+| ------------ | --------------------------- |
+| `j` / `Down` | Next field                  |
+| `k` / `Up`   | Previous field              |
+| `Enter`      | Toggle field text editing   |
+| `t`          | Cycle item type             |
+| `Backspace`  | Delete char (while editing) |
+| `Ctrl+S`     | Save                        |
+| `Esc` / `q`  | Cancel                      |
+
+## Build and run
+
+```bash
+cargo run
+```
+
+Build release binary:
+
+```bash
+cargo build --release
+```
+
+Install locally:
+
+```bash
+cargo install --path .
+```
+
+## Requirements
+
+- Rust toolchain
+- `pdftoppm` available in `PATH` for PDF cover generation (Poppler)
+- A terminal/protocol combination supported by `ratatui-image` for inline cover rendering
+
+## Storage paths
+
+Data and cache directories are resolved with `directories::ProjectDirs("com", "TheSpanishInquisition", "minastirith")`.
+
+- Database file: `<data_dir>/minastirith.db`
+- Cover cache: `<cache_dir>/covers/`
+
+Migrations are applied automatically at startup via `sqlx::migrate!()`.
+
+## Database shape
+
+Main table graph:
 
 ```
 items ──┬── item_authors ──── authors
@@ -46,46 +103,8 @@ items ──┬── item_authors ──── authors
         └── item_categories ─ categories
 ```
 
-Migrations are managed via `sqlx-cli` and live in the `migrations/` folder.
+Note: categories exist in schema, but category management is not yet exposed in the UI.
 
-### Installation
+## Status
 
-```bash
-git clone git@github.com:SpanishInquisition49/Minas-Tirith.git
-cd minastirith
-cargo build
-```
-
-### Database
-
-The SQLite database is automatically created on first run, in a standard OS-dependent path (handled via `directories`):
-
-- **Linux**: `~/.local/share/minastirith/minastirith.db`
-- **macOS**: `~/Library/Application Support/com.TheSpanishInquisition.minastirith/minastirith.db`
-- **Windows**: `%APPDATA%\TheSpanishInquisition\minastirith\minastirith.db`
-
-Migrations are applied automatically at startup via `sqlx::migrate!`.
-
-To run migrations manually:
-
-```bash
-sqlx migrate run --database-url sqlite://<path-to-db>
-```
-
-## Roadmap
-
-- [x] Database schema (items, authors, tags, categories)
-- [x] Metadata provider: Open Library (books)
-- [x] Metadata provider: Crossref (papers/articles/theses)
-- [x] Terminal user interface
-- [ ] Tags and categories management in the UI
-- [ ] Search functionality
-- [ ] Bibliography import/export (BibTeX?)
-
-## License
-
-_To be defined._
-
----
-
-> ⚠️ Early-stage project, schema and internal APIs may change without notice.
+This is an early-stage project and APIs/UX are still evolving.
