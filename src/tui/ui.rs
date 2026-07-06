@@ -12,7 +12,10 @@ use ratatui::{
 };
 use ratatui_image::StatefulImage;
 
-use crate::tui::app::{App, Mode};
+use crate::{
+    schema::graphics::Spannable,
+    tui::app::{App, Mode},
+};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let outer = Layout::default()
@@ -91,7 +94,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let index = app.items_list_state.selected().unwrap_or_default() + 1;
     let total = app.items.len();
     let bottom_line = Line::from(format!(" {index} of {total} "));
-    let title = Line::from("Items".bold());
+    let title = Line::from("Tomes".bold());
     let list = List::new(items)
         .block(
             Block::default()
@@ -135,9 +138,12 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         ]),
     ];
     card.push(Line::from("Authors:\n".bold().style(titles_style)));
+    let mut authors: Vec<Span> = Vec::new();
     for author in &item.authors {
-        card.push(Line::from(format!(" - {}", author.name)));
+        authors.push(author.to_span());
+        authors.push(Span::raw(" "));
     }
+    card.push(Line::from(authors));
     if let Some(date) = item.fields.publication_date.clone() {
         card.push(Line::from(vec![
             "Publication Date: ".bold().style(titles_style),
@@ -170,6 +176,7 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let cols = Layout::default()
         .direction(Horizontal)
         .constraints([Constraint::Length(24), Constraint::Min(0)])
+        .spacing(2)
         .split(inner);
 
     draw_cover_slot(f, app, cols[0], has_cover_url);
@@ -177,6 +184,11 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool) {
+    let cover_area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(22), Constraint::Min(0)])
+        .split(area)[0];
+
     let placeholder_block = Block::default()
         .borders(Borders::ALL)
         .padding(Padding::uniform(1))
@@ -186,19 +198,20 @@ fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool
         let placeholder = Paragraph::new(" \nNo cover")
             .alignment(ratatui::layout::Alignment::Center)
             .block(placeholder_block);
-        f.render_widget(placeholder, area);
+        f.render_widget(placeholder, cover_area);
         return;
     }
 
     match app.selected_cover() {
         Some(protocol) => {
-            f.render_stateful_widget(StatefulImage::default(), area, protocol);
+            // Resize::Fit(None) è già il default: preserva aspect ratio
+            f.render_stateful_widget(StatefulImage::default(), cover_area, protocol);
         }
         None => {
             let placeholder = Paragraph::new("Loading…")
                 .alignment(ratatui::layout::Alignment::Center)
                 .block(placeholder_block);
-            f.render_widget(placeholder, area);
+            f.render_widget(placeholder, cover_area);
         }
     }
 }
@@ -211,7 +224,7 @@ fn draw_status(f: &mut Frame, area: Rect) {
         "<J>".blue().bold(),
         " Search ".into(),
         "</>".blue().bold(),
-        " Add Item ".into(),
+        " Add Tome ".into(),
         "<A>".blue().bold(),
         " Quit ".into(),
         "<Q> ".blue().bold(),

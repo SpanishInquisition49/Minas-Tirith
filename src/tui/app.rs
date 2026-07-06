@@ -61,7 +61,7 @@ impl App {
     ) -> color_eyre::Result<Self> {
         let list = ListState::default();
         let theme = Theme::default()
-            .with_title_top(|_| Line::from(" Add new item ".bold()))
+            .with_title_top(|_| Line::from(" Pick a tome ".bold()))
             .with_title_bottom(|_| {
                 Line::from(vec![" Select: ".into(), "<A> ".blue()]).right_aligned()
             })

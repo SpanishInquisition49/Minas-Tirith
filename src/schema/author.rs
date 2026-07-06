@@ -1,6 +1,13 @@
 use core::fmt;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use chrono::{DateTime, Utc};
+use ratatui::{
+    style::{Color, Style},
+    text::Span,
+};
+
+use crate::schema::graphics::Spannable;
 
 #[derive(Clone, sqlx::FromRow, Debug)]
 pub struct Author {
@@ -19,5 +26,12 @@ impl fmt::Display for Author {
             res.push_str(&format!("Bio:\n{}", bio));
         }
         write!(f, "{res}")
+    }
+}
+
+impl Spannable for Author {
+    fn to_span(&self) -> Span<'static> {
+        let (bg, fg) = Self::tag_colors(&self.slug);
+        Span::styled(format!(" {} ", self.name), Style::default().bg(bg).fg(fg))
     }
 }
