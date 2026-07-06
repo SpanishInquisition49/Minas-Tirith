@@ -1,3 +1,7 @@
+<h1 align="center">
+  <img src="./images/minas.png">
+</h1>
+
 # Minas Tirith
 
 Minas Tirith is a terminal-first personal reference manager for books, articles, reports, theses, and miscellaneous documents.
