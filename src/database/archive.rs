@@ -25,11 +25,32 @@ impl Archive {
     }
 
     const GET_ALL_ITEMS: &str = "SELECT * FROM items";
+    const GET_AUTHORS_FOR_ITEM: &str = "SELECT a.* FROM authors AS a INNER JOIN item_authors AS ia ON a.id = ia.author_id WHERE item_id = ? ORDER BY ia.author_order";
+    const GET_TAGS_FOR_ITEM: &str = "SELECT t.* FROM tags AS t INNER JOIN item_tags AS it ON t.id = it.tag_id WHERE item_id = ? ORDER BY t.slug";
     pub async fn get_all_items(&self) -> color_eyre::Result<Vec<DatabaseItem>> {
-        sqlx::query_as(Archive::GET_ALL_ITEMS)
+        // NOTE: STEP 1: fetch all items
+        let mut items: Vec<DatabaseItem> = sqlx::query_as(Archive::GET_ALL_ITEMS)
             .fetch_all(&self.pool)
             .await
-            .context("Fetching Items")
+            .context("Fetching Items")?;
+
+        // NOTE: STEP 2: fetch all authors and tags for each item
+        for item in &mut items {
+            let authors = sqlx::query_as(Archive::GET_AUTHORS_FOR_ITEM)
+                .bind(item.id)
+                .fetch_all(&self.pool)
+                .await
+                .context("Fetching authors for item")?;
+
+            let tags = sqlx::query_as(Archive::GET_TAGS_FOR_ITEM)
+                .bind(item.id)
+                .fetch_all(&self.pool)
+                .await
+                .context("Fetching tags for item")?;
+            item.authors = authors;
+            item.tags = tags
+        }
+        Ok(items)
     }
 
     const ADD_ITEM: &str = "

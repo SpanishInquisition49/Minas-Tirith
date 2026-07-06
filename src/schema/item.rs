@@ -2,7 +2,10 @@ use core::fmt;
 
 use sqlx::types::chrono::{DateTime, Utc};
 
-use crate::metadata::common_metadata::ItemMetadata;
+use crate::{
+    metadata::common_metadata::ItemMetadata,
+    schema::{author::Author, tag::Tag},
+};
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DatabaseItem {
@@ -12,6 +15,10 @@ pub struct DatabaseItem {
     pub fields: Item,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[sqlx(skip)]
+    pub authors: Vec<Author>,
+    #[sqlx(skip)]
+    pub tags: Vec<Tag>,
 }
 
 impl fmt::Display for DatabaseItem {

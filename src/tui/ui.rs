@@ -5,9 +5,9 @@ use ratatui::{
         Direction::{self, Horizontal},
         Layout, Rect,
     },
-    style::{Modifier, Style, Styled, Stylize},
+    style::{Modifier, Style, Stylize},
     symbols::border,
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph},
 };
 use ratatui_image::StatefulImage;
@@ -134,6 +134,10 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             item.fields.r#type.to_string().into(),
         ]),
     ];
+    card.push(Line::from("Authors:\n".bold().style(titles_style)));
+    for author in &item.authors {
+        card.push(Line::from(format!(" - {}", author.name)));
+    }
     if let Some(date) = item.fields.publication_date.clone() {
         card.push(Line::from(vec![
             "Publication Date: ".bold().style(titles_style),
@@ -153,6 +157,16 @@ fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         ]));
     }
 
+    if !item.tags.is_empty() {
+        let mut tags: Vec<Span> = Vec::new();
+        card.push(Line::from("Tags: ".bold().style(titles_style)));
+        for tag in &item.tags {
+            tags.push(tag.to_span());
+            tags.push(Span::raw(" "));
+        }
+        card.push(Line::from(tags));
+    }
+
     let cols = Layout::default()
         .direction(Horizontal)
         .constraints([Constraint::Length(24), Constraint::Min(0)])
@@ -169,7 +183,7 @@ fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool
         .border_style(Style::default().dim());
 
     if !has_cover_url {
-        let placeholder = Paragraph::new("📚\nNo cover")
+        let placeholder = Paragraph::new(" \nNo cover")
             .alignment(ratatui::layout::Alignment::Center)
             .block(placeholder_block);
         f.render_widget(placeholder, area);

@@ -4,7 +4,6 @@ use color_eyre::eyre::eyre;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::StreamExt;
 use ratatui::{Terminal, backend::Backend};
-use sqlx::sqlite::SqliteOperation::Insert;
 use tokio::time::interval;
 
 use crate::tui::{
@@ -62,7 +61,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             (KeyModifiers::NONE, KeyCode::Esc)
             | (KeyModifiers::NONE, KeyCode::Backspace)
             | (KeyModifiers::NONE, KeyCode::Char('q')) => app.mode = Mode::Normal,
-            (KeyModifiers::NONE, KeyCode::Enter) => {
+            (KeyModifiers::NONE, KeyCode::Char('a')) => {
                 app.request_fetch_metadata_candidates().await?;
             }
             _ => {}

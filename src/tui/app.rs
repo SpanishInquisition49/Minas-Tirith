@@ -63,7 +63,7 @@ impl App {
         let theme = Theme::default()
             .with_title_top(|_| Line::from(" Add new item ".bold()))
             .with_title_bottom(|_| {
-                Line::from(vec![" Select: ".into(), "<C-Enter> ".blue()]).right_aligned()
+                Line::from(vec![" Select: ".into(), "<A> ".blue()]).right_aligned()
             })
             .with_block(Block::bordered().border_set(border::THICK).blue())
             .with_highlight_item_style(Style::default().add_modifier(Modifier::REVERSED).yellow())
