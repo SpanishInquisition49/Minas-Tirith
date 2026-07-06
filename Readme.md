@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="./images/minas.png">
+  <img src="./images/minas.png" style="width: 25%; height: auto;">
 </h1>
 
 # Minas Tirith
