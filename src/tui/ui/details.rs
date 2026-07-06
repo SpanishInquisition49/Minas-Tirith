@@ -11,17 +11,18 @@ use ratatui_image::StatefulImage;
 use crate::{schema::graphics::Spannable, tui::app::App};
 
 pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
-    let title = Line::from("Details".bold());
+    let title = Line::from(" Details ".yellow().bold().italic());
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::THICK)
+        .border_style(Style::default().blue())
         .padding(Padding::uniform(1))
         .title(title);
     let inner = block.inner(area);
     f.render_widget(block, area);
 
     let Some(item) = app.selected_item() else {
-        f.render_widget(Paragraph::new("No selected item"), inner);
+        f.render_widget(Paragraph::new("No selected item".yellow()), inner);
         return;
     };
 
@@ -46,7 +47,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     ];
     card.push(Line::from(Span::styled(
         symbols::DOT.repeat(text_width as usize),
-        Style::default().dim(),
+        Style::default().dark_gray(),
     )));
     card.push(Line::from("Authors:\n".bold().style(titles_style)));
     let authors_pills: Vec<(usize, Span<'static>)> = item
@@ -57,7 +58,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     card.extend(wrap_pills(authors_pills, text_width));
     card.push(Line::from(Span::styled(
         symbols::DOT.repeat(text_width as usize),
-        Style::default().dim(),
+        Style::default().dark_gray(),
     )));
     if let Some(date) = item.fields.publication_date.clone() {
         card.push(Line::from(vec![

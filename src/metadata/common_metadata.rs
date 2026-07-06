@@ -3,7 +3,7 @@ use core::fmt;
 use color_eyre::eyre::eyre;
 
 /// Common interface for metadata from various providers
-pub trait ItemMetadata {
+pub trait ItemMetadata: Send {
     fn title(&self) -> String;
     fn description(&self) -> Option<String>;
     fn item_type(&self) -> ItemType;

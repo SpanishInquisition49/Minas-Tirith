@@ -60,6 +60,10 @@ pub struct App {
     save_tx: UnboundedSender<SaveOutcome>,
     save_rx: UnboundedReceiver<SaveOutcome>,
 
+    pub is_searching: bool,
+    metadata_search_tx: UnboundedSender<Vec<Box<dyn ItemMetadata>>>,
+    metadata_search_rx: UnboundedReceiver<Vec<Box<dyn ItemMetadata>>>,
+
     openlibrary: OpenLibraryManager,
     crossref: CrossrefManager,
     candidate_path: Option<PathBuf>,
@@ -78,16 +82,8 @@ impl App {
         cache: ImageCache,
     ) -> color_eyre::Result<Self> {
         let list = ListState::default();
-        let theme = Theme::default()
-            .with_title_top(|_| Line::from(" Pick a tome ".bold()))
-            .with_title_bottom(|_| {
-                Line::from(vec![" Select: ".into(), "<A> ".blue()]).right_aligned()
-            })
-            .with_block(Block::bordered().border_set(border::THICK).blue())
-            .with_highlight_item_style(Style::default().add_modifier(Modifier::REVERSED).yellow())
-            .with_highlight_dir_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
+
         let explorer = FileExplorerBuilder::default()
-            .theme(theme)
             .working_dir(std::env::home_dir().unwrap())
             .filter_map(|f| {
                 if f.is_dir {
@@ -105,6 +101,7 @@ impl App {
             .build()?;
         let (image_tx, image_rx) = mpsc::unbounded_channel();
         let (save_tx, save_rx) = mpsc::unbounded_channel();
+        let (search_tx, search_rx) = mpsc::unbounded_channel();
 
         let mut app = Self {
             archive,
@@ -132,6 +129,9 @@ impl App {
             save_tx,
             save_rx,
             tick_counter: 0,
+            is_searching: false,
+            metadata_search_tx: search_tx,
+            metadata_search_rx: search_rx,
         };
         app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
@@ -141,7 +141,7 @@ impl App {
     pub fn select_prev(&mut self) {
         let i = match self.items_list_state.selected() {
             Some(i) if i > 0 => i - 1,
-            Some(i) => i,
+            Some(_) => self.items.len() - 1,
             None => 0,
         };
         self.items_list_state.select(Some(i));
@@ -150,7 +150,7 @@ impl App {
     pub fn select_next(&mut self) {
         let i = match self.items_list_state.selected() {
             Some(i) if i + 1 < self.items.len() => i + 1,
-            Some(i) => i,
+            Some(_) => 0,
             None => 0,
         };
         self.items_list_state.select(Some(i));
@@ -258,13 +258,11 @@ impl App {
         Ok(())
     }
 
-    pub async fn request_fetch_metadata_candidates(&mut self) -> color_eyre::Result<()> {
+    pub fn request_fetch_metadata_candidates(&mut self) {
         let file = self.file_explorer.current();
         if !file.is_file() {
-            return Ok(());
+            return;
         }
-
-        let mut candidates: Vec<Box<dyn ItemMetadata>> = Vec::new();
 
         let filename = file
             .path
@@ -273,29 +271,46 @@ impl App {
             .to_string_lossy()
             .to_string();
 
-        let books = self.openlibrary.fetch(&filename).await?;
-        candidates.extend(
-            books
-                .into_iter()
-                .map(|b| Box::new(b) as Box<dyn ItemMetadata>),
-        );
+        self.is_searching = true;
+        let tx = self.metadata_search_tx.clone();
+        let openlibrary = self.openlibrary.clone();
+        let crossref = self.crossref.clone();
+        tokio::spawn(async move {
+            let mut candidates: Vec<Box<dyn ItemMetadata>> = Vec::new();
+            let books = openlibrary.fetch(&filename).await;
+            if let Ok(books) = books {
+                candidates.extend(
+                    books
+                        .into_iter()
+                        .map(|b| Box::new(b) as Box<dyn ItemMetadata>),
+                );
+            }
 
-        let articles = self.crossref.fetch(&filename).await?;
-        candidates.extend(
-            articles
-                .into_iter()
-                .map(|a| Box::new(a) as Box<dyn ItemMetadata>),
-        );
+            let articles = crossref.fetch(&filename).await;
+            if let Ok(articles) = articles {
+                candidates.extend(
+                    articles
+                        .into_iter()
+                        .map(|a| Box::new(a) as Box<dyn ItemMetadata>),
+                );
+            }
+            let _ = tx.send(candidates);
+        });
+    }
 
-        self.metadata_candidates = candidates;
-        self.metadata_list_state = ListState::default();
-        self.candidate_path = Some(file.path.clone());
+    pub fn poll_metadata_search(&mut self) -> color_eyre::Result<()> {
+        while let Ok(candidates) = self.metadata_search_rx.try_recv() {
+            let file = self.file_explorer.current();
+            self.is_searching = false;
+            self.metadata_candidates = candidates;
+            self.metadata_list_state = ListState::default();
+            self.candidate_path = Some(file.path.clone());
 
-        if !self.metadata_candidates.is_empty() {
-            self.metadata_list_state.select(Some(0));
-            self.mode = Mode::MetadataSelect;
+            if !self.metadata_candidates.is_empty() {
+                self.metadata_list_state.select(Some(0));
+                self.mode = Mode::MetadataSelect;
+            }
         }
-
         Ok(())
     }
 

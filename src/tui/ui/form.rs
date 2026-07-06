@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style, Stylize},
+    style::{Style, Stylize},
     symbols::border,
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Padding, Paragraph},
@@ -22,9 +22,10 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     let title = if app.saving {
         let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let frame = spinner[app.tick_counter % spinner.len()];
-        Line::from(format!(" {frame} Saving... ").bold())
+        app.tick_counter += 1;
+        Line::from(format!(" {frame} Saving... ").bold().italic().yellow())
     } else {
-        Line::from(" Edit metadata ".bold())
+        Line::from(" Edit metadata ".bold().italic().yellow())
     };
 
     let block = Block::default()
@@ -34,8 +35,18 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         .padding(Padding::uniform(1))
         .title(title)
         .title_bottom(
-            Line::from(" Move <j/k> Edit field <Enter> Save <Ctrl+S> Cancel <Esc> ")
-                .right_aligned(),
+            Line::from(vec![
+                " Move".yellow(),
+                " <j/k>".green(),
+                " Edit field".yellow(),
+                " <Enter>".green(),
+                " Save".yellow(),
+                " <Ctrl+S>".green(),
+                " Cancel".yellow(),
+                " <Esc> ".green(),
+            ])
+            .yellow()
+            .right_aligned(),
         );
 
     let inner = block.inner(center);
@@ -83,7 +94,7 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         let style = if is_selected {
             Style::default().yellow()
         } else {
-            Style::default()
+            Style::default().white()
         };
 
         let input = Paragraph::new(value)

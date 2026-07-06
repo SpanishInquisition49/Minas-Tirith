@@ -37,6 +37,7 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
             }
             _ = tick.tick() => {
                 app.poll_covers();
+                app.poll_metadata_search();
                 app.poll_save().await?;
             }
         }
@@ -69,7 +70,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             | (KeyModifiers::NONE, KeyCode::Backspace)
             | (KeyModifiers::NONE, KeyCode::Char('q')) => app.mode = Mode::Normal,
             (KeyModifiers::NONE, KeyCode::Char('a')) => {
-                app.request_fetch_metadata_candidates().await?;
+                app.request_fetch_metadata_candidates();
             }
             _ => {}
         },

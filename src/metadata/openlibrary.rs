@@ -8,6 +8,7 @@ use crate::metadata::{
     proxy::MetadataFetcher,
 };
 
+#[derive(Clone, Debug)]
 pub struct OpenLibraryManager {
     client: Client,
 }

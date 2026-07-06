@@ -117,6 +117,7 @@ impl ItemMetadata for CrossrefItem {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct CrossrefManager {
     client: Client,
 }

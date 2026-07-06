@@ -7,9 +7,10 @@ use ratatui::{
     },
     style::{Modifier, Style, Stylize},
     symbols::border,
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph},
 };
+use ratatui_explorer::Theme;
 
 use crate::tui::{
     app::{App, Mode},
@@ -26,6 +27,28 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .direction(Horizontal)
         .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
         .split(outer[0]);
+
+    let title = if app.is_searching {
+        let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+        let frame = spinner[app.tick_counter % spinner.len()];
+        app.tick_counter += 1;
+        format!(" {frame} Searching for metadata... ")
+            .bold()
+            .yellow()
+            .italic()
+    } else {
+        " Pick a tome ".bold().yellow().italic()
+    };
+    let theme = Theme::default()
+        .with_title_top(move |_| Line::from(title.clone()))
+        .with_title_bottom(|_| {
+            Line::from(vec![" Select: ".yellow(), "<A> ".green()]).right_aligned()
+        })
+        .with_block(Block::bordered().border_set(border::THICK).blue())
+        .with_highlight_item_style(Style::default().add_modifier(Modifier::REVERSED).yellow())
+        .with_highlight_dir_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
+
+    app.file_explorer.set_theme(theme);
 
     draw_list(f, app, main[0]);
     draw_details(f, app, main[1]);
@@ -68,10 +91,14 @@ fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
                 .border_set(border::THICK)
                 .border_style(Style::default().blue())
                 .padding(Padding::uniform(1))
-                .title(Line::from("Select metadata".bold()))
-                .title_bottom(Line::from(" <Enter> Confirm  <Esc> Cancel ").right_aligned()),
+                .title(Line::from("Select metadata".bold()).yellow().italic())
+                .title_bottom(
+                    Line::from(" <Enter> Confirm  <Esc> Cancel ")
+                        .right_aligned()
+                        .yellow(),
+                ),
         )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
+        .highlight_style(Style::default().green());
 
     f.render_stateful_widget(list, center, &mut app.metadata_list_state);
 }
@@ -93,8 +120,8 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
 
     let index = app.items_list_state.selected().unwrap_or_default() + 1;
     let total = app.items.len();
-    let bottom_line = Line::from(format!(" {index} of {total} "));
-    let title = Line::from("Tomes".bold());
+    let bottom_line = Line::from(format!(" {index} of {total} ").yellow());
+    let title = Line::from(" Tomes ".bold().yellow().italic());
     let list = List::new(items)
         .block(
             Block::default()
@@ -105,25 +132,25 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
                 .title(title)
                 .title_bottom(bottom_line.right_aligned()),
         )
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED).yellow());
+        .highlight_style(Style::default().green());
 
     f.render_stateful_widget(list, area, &mut app.items_list_state);
 }
 
 fn draw_status(f: &mut Frame, area: Rect) {
     let instructions = Line::from(vec![
-        " Navigate Up ".into(),
-        "<K>".blue().bold(),
-        " Navigate Down ".into(),
-        "<J>".blue().bold(),
-        " Search ".into(),
-        "</>".blue().bold(),
-        " Add Tome ".into(),
-        "<A>".blue().bold(),
-        " Edit Tome ".into(),
-        "<E>".blue().bold(),
-        " Quit ".into(),
-        "<Q> ".blue().bold(),
+        " Navigate Up ".yellow(),
+        "<K>".green().bold(),
+        " Navigate Down ".yellow(),
+        "<J>".green().bold(),
+        " Search ".yellow(),
+        "</>".green().bold(),
+        " Add Tome ".yellow(),
+        "<A>".green().bold(),
+        " Edit Tome ".yellow(),
+        "<E>".green().bold(),
+        " Quit ".yellow(),
+        "<Q> ".green().bold(),
     ]);
     f.render_widget(Paragraph::new(instructions), area);
 }
