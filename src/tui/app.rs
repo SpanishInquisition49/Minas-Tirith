@@ -5,13 +5,8 @@ use std::{
 };
 
 use color_eyre::eyre::Context;
-use ratatui::{
-    style::{Modifier, Style, Stylize},
-    symbols::border,
-    text::Line,
-    widgets::{Block, ListState},
-};
-use ratatui_explorer::{FileExplorer, FileExplorerBuilder, Theme};
+use ratatui::widgets::ListState;
+use ratatui_explorer::{FileExplorer, FileExplorerBuilder};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
@@ -47,7 +42,7 @@ pub struct App {
     pub mode: Mode,
     pub items: Vec<DatabaseItem>,
     pub items_list_state: ListState,
-    pub search_query: String,
+    //pub search_query: String,
     pub quit: bool,
     pub file_explorer: FileExplorer,
     // Metadata for new items
@@ -112,7 +107,7 @@ impl App {
             mode: Mode::Normal,
             items: Vec::new(),
             items_list_state: list,
-            search_query: String::new(),
+            //search_query: String::new(),
             quit: false,
             covers: HashMap::new(),
             pending_covers: HashSet::new(),
@@ -299,7 +294,7 @@ impl App {
         });
     }
 
-    pub fn poll_metadata_search(&mut self) -> color_eyre::Result<()> {
+    pub fn poll_metadata_search(&mut self) {
         while let Ok(candidates) = self.metadata_search_rx.try_recv() {
             let file = self.file_explorer.current();
             self.is_searching = false;
@@ -312,7 +307,6 @@ impl App {
                 self.mode = Mode::MetadataSelect;
             }
         }
-        Ok(())
     }
 
     pub fn select_metadata_prev(&mut self) {

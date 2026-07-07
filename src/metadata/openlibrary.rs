@@ -25,7 +25,6 @@ pub struct OpenLibraryItem {
     first_publish_year: Option<i32>,
     #[serde(rename = "cover_i")]
     cover_url: Option<i64>,
-    key: String,
     ia: Option<Vec<String>>,
 }
 
@@ -71,10 +70,6 @@ impl ItemMetadata for OpenLibraryItem {
 
     fn source(&self) -> String {
         "openlibrary".to_string()
-    }
-
-    fn source_id(&self) -> Option<String> {
-        Some(self.key.clone())
     }
 
     fn description(&self) -> Option<String> {

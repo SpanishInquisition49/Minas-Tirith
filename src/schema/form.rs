@@ -1,4 +1,4 @@
-use crossterm::event::{Event, KeyEvent};
+use crossterm::event::Event;
 use slug::slugify;
 use tui_input::{Input, backend::crossterm::EventHandler};
 
@@ -70,10 +70,6 @@ impl ItemMetadata for MetadataForm {
 
     fn source(&self) -> String {
         "internal".to_string()
-    }
-
-    fn source_id(&self) -> Option<String> {
-        None
     }
 
     fn tags(&self) -> Vec<String> {

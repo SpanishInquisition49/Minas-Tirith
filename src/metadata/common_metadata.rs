@@ -14,7 +14,6 @@ pub trait ItemMetadata: Send {
     fn cover_image_url(&self) -> Option<String>;
     fn slug(&self) -> String;
     fn source(&self) -> String;
-    fn source_id(&self) -> Option<String>;
     fn tags(&self) -> Vec<String>;
 }
 

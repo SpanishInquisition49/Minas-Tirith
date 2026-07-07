@@ -10,12 +10,7 @@ use sqlx::{
 
 use crate::{
     database::archive::Archive,
-    metadata::{
-        crosseref::{CrossrefItem, CrossrefManager},
-        image_cache::ImageCache,
-        openlibrary::{OpenLibraryItem, OpenLibraryManager},
-        proxy::MetadataFetcher,
-    },
+    metadata::image_cache::ImageCache,
     tui::{app::App, event::run},
 };
 

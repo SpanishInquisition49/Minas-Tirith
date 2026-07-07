@@ -100,10 +100,6 @@ impl ItemMetadata for CrossrefItem {
         "crossref".to_string()
     }
 
-    fn source_id(&self) -> Option<String> {
-        Some(self.doi.clone())
-    }
-
     fn description(&self) -> Option<String> {
         None
     }
