@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
+    sync::Arc,
 };
 
 use color_eyre::eyre::Context;
@@ -42,7 +43,7 @@ pub enum SaveOutcome {
 }
 
 pub struct App {
-    pub archive: Archive,
+    pub archive: Arc<Archive>,
     pub mode: Mode,
     pub items: Vec<DatabaseItem>,
     pub items_list_state: ListState,
@@ -57,21 +58,21 @@ pub struct App {
     pub saving: bool,
     pub last_error: Option<String>,
     pub tick_counter: usize,
-    save_tx: UnboundedSender<SaveOutcome>,
+    save_tx: Arc<UnboundedSender<SaveOutcome>>,
     save_rx: UnboundedReceiver<SaveOutcome>,
 
     pub is_searching: bool,
-    metadata_search_tx: UnboundedSender<Vec<Box<dyn ItemMetadata>>>,
+    metadata_search_tx: Arc<UnboundedSender<Vec<Box<dyn ItemMetadata>>>>,
     metadata_search_rx: UnboundedReceiver<Vec<Box<dyn ItemMetadata>>>,
 
-    openlibrary: OpenLibraryManager,
-    crossref: CrossrefManager,
+    openlibrary: Arc<OpenLibraryManager>,
+    crossref: Arc<CrossrefManager>,
     candidate_path: Option<PathBuf>,
-    picker: Picker,
-    cache: ImageCache,
+    picker: Arc<Picker>,
+    cache: Arc<ImageCache>,
     covers: HashMap<i32, StatefulProtocol>,
     pending_covers: HashSet<i32>,
-    image_tx: UnboundedSender<(i32, StatefulProtocol, Option<String>)>,
+    image_tx: Arc<UnboundedSender<(i32, StatefulProtocol, Option<String>)>>,
     image_rx: UnboundedReceiver<(i32, StatefulProtocol, Option<String>)>,
 }
 
@@ -101,12 +102,12 @@ impl App {
             .build()?;
         let (image_tx, image_rx) = mpsc::unbounded_channel();
         let (save_tx, save_rx) = mpsc::unbounded_channel();
-        let (search_tx, search_rx) = mpsc::unbounded_channel();
+        let (metada_search_tx, metadata_search_rx) = mpsc::unbounded_channel();
 
         let mut app = Self {
-            archive,
-            picker,
-            cache,
+            archive: Arc::new(archive),
+            picker: Arc::new(picker),
+            cache: Arc::new(cache),
             file_explorer: explorer,
             mode: Mode::Normal,
             items: Vec::new(),
@@ -115,10 +116,10 @@ impl App {
             quit: false,
             covers: HashMap::new(),
             pending_covers: HashSet::new(),
-            image_tx,
+            image_tx: Arc::new(image_tx),
             image_rx,
-            crossref: CrossrefManager::new(),
-            openlibrary: OpenLibraryManager::new(),
+            crossref: Arc::new(CrossrefManager::new()),
+            openlibrary: Arc::new(OpenLibraryManager::new()),
             metadata_candidates: Vec::new(),
             metadata_list_state: ListState::default(),
             candidate_path: None,
@@ -126,12 +127,12 @@ impl App {
             edit_context: None,
             saving: false,
             last_error: None,
-            save_tx,
+            save_tx: Arc::new(save_tx),
             save_rx,
             tick_counter: 0,
             is_searching: false,
-            metadata_search_tx: search_tx,
-            metadata_search_rx: search_rx,
+            metadata_search_tx: Arc::new(metada_search_tx),
+            metadata_search_rx,
         };
         app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
