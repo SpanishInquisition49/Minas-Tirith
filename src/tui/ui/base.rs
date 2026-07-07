@@ -60,6 +60,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::MetadataSelect => draw_metadata_select_popup(f, app),
         Mode::MetadataEdit => draw_metadata_edit_popup(f, app),
     }
+    app.notifications.render(f, f.area());
 }
 
 fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {

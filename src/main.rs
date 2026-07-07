@@ -58,7 +58,6 @@ async fn main() -> color_eyre::Result<()> {
         .context("Connecting to Database")?;
     let archive = Archive::from_pool(pool);
     archive.migrate().await.context("Running Migrations")?;
-    //openlibrary(&archive).await?;
 
     let mut terminal = ratatui::init();
     let picker =

@@ -91,16 +91,21 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         };
         let value = form.field_value(i);
         let is_selected = i == form.field_index;
-        let style = if is_selected {
-            Style::default().yellow()
+        let (style, title_style) = if is_selected {
+            (Style::default().white(), Style::default().green())
         } else {
-            Style::default().white()
+            (Style::default().dark_gray(), Style::default().yellow())
         };
 
         let input = Paragraph::new(value)
             .style(style)
             .scroll((0, scroll as u16))
-            .block(Block::bordered().title(format!(" {label} ")));
+            .block(
+                Block::bordered()
+                    .title(format!(" {label} "))
+                    .border_style(Style::default().blue())
+                    .title_style(title_style),
+            );
         f.render_widget(input, rows[i]);
         if form.editing && is_selected {
             let x = match i {

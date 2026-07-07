@@ -78,6 +78,22 @@ impl ItemMetadata for MetadataForm {
 }
 
 impl MetadataForm {
+    pub fn new() -> Self {
+        Self {
+            title: Input::default(),
+            description: Input::default(),
+            doi: Input::default(),
+            isbn: Input::default(),
+            publication_date: Input::default(),
+            tags: Input::default(),
+            item_type: ItemType::Misc,
+            cover_image_url: None,
+            authors: Vec::new(),
+            field_index: 0,
+            editing: false,
+        }
+    }
+
     pub fn from_candidate(candidate: &dyn ItemMetadata) -> Self {
         Self {
             title: candidate.title().into(),

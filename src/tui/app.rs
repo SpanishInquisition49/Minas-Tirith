@@ -2,12 +2,21 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
     sync::Arc,
+    time::Duration,
 };
 
 use color_eyre::eyre::Context;
-use ratatui::widgets::ListState;
+use ratatui::{
+    style::{Color, Style},
+    symbols::border,
+    widgets::ListState,
+};
 use ratatui_explorer::{FileExplorer, FileExplorerBuilder};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
+use ratatui_notifications::{
+    Anchor, Animation, AutoDismiss, Level, Notification, Notifications, SizeConstraint,
+    SlideDirection, Timing,
+};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use crate::{
@@ -38,6 +47,7 @@ pub enum SaveOutcome {
 }
 
 pub struct App {
+    pub notifications: Notifications,
     pub archive: Arc<Archive>,
     pub mode: Mode,
     pub items: Vec<DatabaseItem>,
@@ -100,6 +110,7 @@ impl App {
         let (metada_search_tx, metadata_search_rx) = mpsc::unbounded_channel();
 
         let mut app = Self {
+            notifications: Notifications::new(),
             archive: Arc::new(archive),
             picker: Arc::new(picker),
             cache: Arc::new(cache),
@@ -305,6 +316,32 @@ impl App {
             if !self.metadata_candidates.is_empty() {
                 self.metadata_list_state.select(Some(0));
                 self.mode = Mode::MetadataSelect;
+            } else {
+                let file = self.file_explorer.current();
+                if let Ok(notif) = Notification::new("Couldn't find metadata")
+                    .title("  Warning ")
+                    .timing(
+                        Timing::Fixed(Duration::from_millis(500)),
+                        Timing::Fixed(Duration::from_secs(3)),
+                        Timing::Fixed(Duration::from_millis(500)),
+                    )
+                    .border_style(Style::default().fg(Color::Yellow))
+                    .title_style(Style::default().fg(Color::Yellow))
+                    .max_size(SizeConstraint::Percentage(0.6), SizeConstraint::Absolute(4))
+                    .anchor(Anchor::TopRight)
+                    .animation(Animation::Slide)
+                    .level(Level::Warn)
+                    .slide_direction(SlideDirection::FromTop)
+                    .auto_dismiss(AutoDismiss::After(Duration::from_secs(2)))
+                    .build()
+                {
+                    let _ = self.notifications.add(notif);
+                }
+                self.metadata_form = Some(MetadataForm::new());
+                self.edit_context = Some(EditContext::NewItem {
+                    path: file.path.clone(),
+                });
+                self.mode = Mode::MetadataEdit;
             }
         }
     }

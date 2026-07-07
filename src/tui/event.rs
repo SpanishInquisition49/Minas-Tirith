@@ -13,13 +13,15 @@ use crate::tui::{
 
 pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color_eyre::Result<()> {
     let mut events = EventStream::new();
-    let mut tick = interval(Duration::from_millis(100));
+    let mut tick = interval(Duration::from_millis(16));
 
     loop {
         // HACK: couldn't hoist the error with the '?' operator
         if let Err(e) = terminal.draw(|f| draw(f, app)) {
             return Err(eyre!("{e}"));
         }
+
+        app.notifications.tick(Duration::from_millis(16));
 
         tokio::select! {
             maybe_event = events.next() => {
