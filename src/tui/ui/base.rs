@@ -140,17 +140,17 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
 
 fn draw_status(f: &mut Frame, area: Rect) {
     let instructions = Line::from(vec![
-        " Navigate Up ".yellow(),
-        "<K>".green().bold(),
-        " Navigate Down ".yellow(),
-        "<J>".green().bold(),
-        " Search ".yellow(),
+        " Navigate: ".yellow(),
+        "<K/J>".green().bold(),
+        " Search: ".yellow(),
         "</>".green().bold(),
-        " Add Tome ".yellow(),
+        " Add Tome: ".yellow(),
         "<A>".green().bold(),
-        " Edit Tome ".yellow(),
+        " Edit Tome: ".yellow(),
         "<E>".green().bold(),
-        " Quit ".yellow(),
+        " Export Bibtex: ".yellow(),
+        "<B>".green().bold(),
+        " Quit: ".yellow(),
         "<Q> ".green().bold(),
     ]);
     f.render_widget(Paragraph::new(instructions), area);

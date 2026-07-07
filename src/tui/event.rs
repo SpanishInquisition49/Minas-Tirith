@@ -38,9 +38,7 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
                 }
             }
             _ = tick.tick() => {
-                app.poll_covers();
-                app.poll_metadata_search();
-                app.poll_save().await?;
+                app.poll_messages().await?;
             }
         }
 
@@ -64,6 +62,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             KeyCode::Char('e') => {
                 app.open_metadata_edit_for_selected_item();
             }
+            KeyCode::Char('b') => app.send_bibtex_to_system_clipboard(),
             KeyCode::Char('/') => app.mode = Mode::Search,
             _ => {}
         },

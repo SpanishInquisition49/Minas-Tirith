@@ -5,10 +5,10 @@ use std::{
     time::Duration,
 };
 
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use color_eyre::eyre::Context;
 use ratatui::{
     style::{Color, Style},
-    symbols::border,
     widgets::ListState,
 };
 use ratatui_explorer::{FileExplorer, FileExplorerBuilder};
@@ -25,7 +25,11 @@ use crate::{
         common_metadata::ItemMetadata, cover_generator::generate_cover, crosseref::CrossrefManager,
         image_cache::ImageCache, openlibrary::OpenLibraryManager, proxy::MetadataFetcher,
     },
-    schema::{form::MetadataForm, item::DatabaseItem},
+    schema::{
+        form::MetadataForm,
+        item::DatabaseItem,
+        message::{CoverImageData, Message, SaveOutcome},
+    },
 };
 
 pub enum Mode {
@@ -39,11 +43,6 @@ pub enum Mode {
 pub enum EditContext {
     NewItem { path: PathBuf },
     ExistingItem { id: i32 },
-}
-
-pub enum SaveOutcome {
-    Saved,
-    Failed(String),
 }
 
 pub struct App {
@@ -63,12 +62,7 @@ pub struct App {
     pub saving: bool,
     pub last_error: Option<String>,
     pub tick_counter: usize,
-    save_tx: Arc<UnboundedSender<SaveOutcome>>,
-    save_rx: UnboundedReceiver<SaveOutcome>,
-
     pub is_searching: bool,
-    metadata_search_tx: Arc<UnboundedSender<Vec<Box<dyn ItemMetadata>>>>,
-    metadata_search_rx: UnboundedReceiver<Vec<Box<dyn ItemMetadata>>>,
 
     openlibrary: Arc<OpenLibraryManager>,
     crossref: Arc<CrossrefManager>,
@@ -77,8 +71,9 @@ pub struct App {
     cache: Arc<ImageCache>,
     covers: HashMap<i32, StatefulProtocol>,
     pending_covers: HashSet<i32>,
-    image_tx: Arc<UnboundedSender<(i32, StatefulProtocol, Option<String>)>>,
-    image_rx: UnboundedReceiver<(i32, StatefulProtocol, Option<String>)>,
+
+    task_channel_tx: Arc<UnboundedSender<Message>>,
+    task_channel_rx: UnboundedReceiver<Message>,
 }
 
 impl App {
@@ -105,9 +100,8 @@ impl App {
                 }
             })
             .build()?;
-        let (image_tx, image_rx) = mpsc::unbounded_channel();
-        let (save_tx, save_rx) = mpsc::unbounded_channel();
-        let (metada_search_tx, metadata_search_rx) = mpsc::unbounded_channel();
+
+        let (task_channel_tx, task_channel_rx) = mpsc::unbounded_channel();
 
         let mut app = Self {
             notifications: Notifications::new(),
@@ -122,8 +116,6 @@ impl App {
             quit: false,
             covers: HashMap::new(),
             pending_covers: HashSet::new(),
-            image_tx: Arc::new(image_tx),
-            image_rx,
             crossref: Arc::new(CrossrefManager::new()),
             openlibrary: Arc::new(OpenLibraryManager::new()),
             metadata_candidates: Vec::new(),
@@ -133,12 +125,10 @@ impl App {
             edit_context: None,
             saving: false,
             last_error: None,
-            save_tx: Arc::new(save_tx),
-            save_rx,
             tick_counter: 0,
             is_searching: false,
-            metadata_search_tx: Arc::new(metada_search_tx),
-            metadata_search_rx,
+            task_channel_tx: Arc::new(task_channel_tx),
+            task_channel_rx,
         };
         app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
@@ -189,7 +179,7 @@ impl App {
         self.pending_covers.insert(id);
         let cache = self.cache.clone();
         let picker = self.picker.clone();
-        let tx = self.image_tx.clone();
+        let tx = self.task_channel_tx.clone();
 
         tokio::spawn(async move {
             let result: color_eyre::Result<StatefulProtocol> = async {
@@ -203,7 +193,11 @@ impl App {
             .await;
 
             if let Ok(protocol) = result {
-                let _ = tx.send((id, protocol, None));
+                let _ = tx.send(Message::ImageCover(Box::new(CoverImageData {
+                    item_id: id,
+                    protocol,
+                    url: None,
+                })));
             }
         });
     }
@@ -213,7 +207,7 @@ impl App {
         let cache = self.cache.clone();
         let picker = self.picker.clone();
         let archive = self.archive.clone();
-        let tx = self.image_tx.clone();
+        let tx = self.task_channel_tx.clone();
         let path = PathBuf::from(file_path);
 
         tokio::spawn(async move {
@@ -236,19 +230,21 @@ impl App {
             .await;
 
             if let Ok((protocol, url)) = result {
-                let _ = tx.send((id, protocol, Some(url)));
+                let _ = tx.send(Message::ImageCover(Box::new(CoverImageData {
+                    item_id: id,
+                    protocol,
+                    url: Some(url),
+                })));
             }
         });
     }
-    pub fn poll_covers(&mut self) {
-        while let Ok((id, protocol, maybe_url)) = self.image_rx.try_recv() {
-            self.pending_covers.remove(&id);
-            self.covers.insert(id, protocol);
-            if let Some(url) = maybe_url
-                && let Some(item) = self.items.iter_mut().find(|i| i.id == id)
-            {
-                item.fields.cover_image_url = Some(url);
-            }
+    pub fn handle_cover_message(&mut self, cover_data: CoverImageData) {
+        self.pending_covers.remove(&cover_data.item_id);
+        self.covers.insert(cover_data.item_id, cover_data.protocol);
+        if let Some(url) = cover_data.url
+            && let Some(item) = self.items.iter_mut().find(|i| i.id == cover_data.item_id)
+        {
+            item.fields.cover_image_url = Some(url);
         }
     }
 
@@ -279,7 +275,7 @@ impl App {
             .to_string();
 
         self.is_searching = true;
-        let tx = self.metadata_search_tx.clone();
+        let tx = self.task_channel_tx.clone();
         let openlibrary = self.openlibrary.clone();
         let crossref = self.crossref.clone();
         tokio::spawn(async move {
@@ -301,48 +297,46 @@ impl App {
                         .map(|a| Box::new(a) as Box<dyn ItemMetadata>),
                 );
             }
-            let _ = tx.send(candidates);
+            let _ = tx.send(Message::Metadata(candidates));
         });
     }
 
-    pub fn poll_metadata_search(&mut self) {
-        while let Ok(candidates) = self.metadata_search_rx.try_recv() {
-            let file = self.file_explorer.current();
-            self.is_searching = false;
-            self.metadata_candidates = candidates;
-            self.metadata_list_state = ListState::default();
-            self.candidate_path = Some(file.path.clone());
+    pub fn handle_metadata_search_message(&mut self, candidates: Vec<Box<dyn ItemMetadata>>) {
+        let file = self.file_explorer.current();
+        self.is_searching = false;
+        self.metadata_candidates = candidates;
+        self.metadata_list_state = ListState::default();
+        self.candidate_path = Some(file.path.clone());
 
-            if !self.metadata_candidates.is_empty() {
-                self.metadata_list_state.select(Some(0));
-                self.mode = Mode::MetadataSelect;
-            } else {
-                let file = self.file_explorer.current();
-                if let Ok(notif) = Notification::new("Couldn't find metadata")
-                    .title("  Warning ")
-                    .timing(
-                        Timing::Fixed(Duration::from_millis(500)),
-                        Timing::Fixed(Duration::from_secs(3)),
-                        Timing::Fixed(Duration::from_millis(500)),
-                    )
-                    .border_style(Style::default().fg(Color::Yellow))
-                    .title_style(Style::default().fg(Color::Yellow))
-                    .max_size(SizeConstraint::Percentage(0.6), SizeConstraint::Absolute(4))
-                    .anchor(Anchor::TopRight)
-                    .animation(Animation::Slide)
-                    .level(Level::Warn)
-                    .slide_direction(SlideDirection::FromTop)
-                    .auto_dismiss(AutoDismiss::After(Duration::from_secs(2)))
-                    .build()
-                {
-                    let _ = self.notifications.add(notif);
-                }
-                self.metadata_form = Some(MetadataForm::new());
-                self.edit_context = Some(EditContext::NewItem {
-                    path: file.path.clone(),
-                });
-                self.mode = Mode::MetadataEdit;
+        if !self.metadata_candidates.is_empty() {
+            self.metadata_list_state.select(Some(0));
+            self.mode = Mode::MetadataSelect;
+        } else {
+            let file = self.file_explorer.current();
+            if let Ok(notif) = Notification::new("Couldn't find metadata")
+                .title("  Warning ")
+                .timing(
+                    Timing::Fixed(Duration::from_millis(500)),
+                    Timing::Fixed(Duration::from_secs(3)),
+                    Timing::Fixed(Duration::from_millis(500)),
+                )
+                .border_style(Style::default().fg(Color::Yellow))
+                .title_style(Style::default().fg(Color::Yellow))
+                .max_size(SizeConstraint::Percentage(0.6), SizeConstraint::Absolute(4))
+                .anchor(Anchor::TopRight)
+                .animation(Animation::Slide)
+                .level(Level::Warn)
+                .slide_direction(SlideDirection::FromTop)
+                .auto_dismiss(AutoDismiss::After(Duration::from_secs(2)))
+                .build()
+            {
+                let _ = self.notifications.add(notif);
             }
+            self.metadata_form = Some(MetadataForm::new());
+            self.edit_context = Some(EditContext::NewItem {
+                path: file.path.clone(),
+            });
+            self.mode = Mode::MetadataEdit;
         }
     }
 
@@ -403,7 +397,7 @@ impl App {
         self.saving = true;
         self.last_error = None;
         let archive = self.archive.clone();
-        let tx = self.save_tx.clone();
+        let tx = self.task_channel_tx.clone();
 
         tokio::spawn(async move {
             let result = match ctx {
@@ -414,20 +408,31 @@ impl App {
                 Ok(()) => SaveOutcome::Saved,
                 Err(e) => SaveOutcome::Failed(e.to_string()),
             };
-            let _ = tx.send(outcome);
+            let _ = tx.send(Message::Save(outcome));
         });
     }
 
-    pub async fn poll_save(&mut self) -> color_eyre::Result<()> {
-        while let Ok(outcome) = self.save_rx.try_recv() {
-            self.saving = false;
-            match outcome {
-                SaveOutcome::Saved => {
-                    self.mode = Mode::Normal;
-                    self.metadata_candidates.clear();
-                    self.request_refresh_item_list().await?;
+    pub async fn handle_save_message(&mut self, outcome: &SaveOutcome) -> color_eyre::Result<()> {
+        self.saving = false;
+        match outcome {
+            SaveOutcome::Saved => {
+                self.mode = Mode::Normal;
+                self.metadata_candidates.clear();
+                self.request_refresh_item_list().await?;
+            }
+            SaveOutcome::Failed(err) => self.last_error = Some(err.to_string()),
+        }
+        Ok(())
+    }
+
+    pub async fn poll_messages(&mut self) -> color_eyre::Result<()> {
+        while let Ok(message) = self.task_channel_rx.try_recv() {
+            match message {
+                Message::Save(save_outcome) => self.handle_save_message(&save_outcome).await?,
+                Message::Metadata(item_metadatas) => {
+                    self.handle_metadata_search_message(item_metadatas)
                 }
-                SaveOutcome::Failed(err) => self.last_error = Some(err),
+                Message::ImageCover(cover_data) => self.handle_cover_message(*cover_data),
             }
         }
         Ok(())
@@ -456,5 +461,32 @@ impl App {
         let path = PathBuf::from(&item.path);
         opener::open(path)?;
         Ok(())
+    }
+
+    pub fn send_bibtex_to_system_clipboard(&mut self) {
+        let Some(item) = self.selected_item() else {
+            // TODO: add notification for failure
+            return;
+        };
+        let bibtex = item.to_bibtex();
+        let mut ctx = ClipboardContext::new().unwrap();
+        ctx.set_contents(bibtex.to_owned());
+        if let Ok(notif) = Notification::new("Copied Bibtex")
+            .title("  Info ")
+            .timing(
+                Timing::Fixed(Duration::from_millis(500)),
+                Timing::Fixed(Duration::from_secs(3)),
+                Timing::Fixed(Duration::from_millis(500)),
+            )
+            .max_size(SizeConstraint::Percentage(0.6), SizeConstraint::Absolute(4))
+            .anchor(Anchor::TopRight)
+            .animation(Animation::Slide)
+            .level(Level::Info)
+            .slide_direction(SlideDirection::FromTop)
+            .auto_dismiss(AutoDismiss::After(Duration::from_secs(2)))
+            .build()
+        {
+            let _ = self.notifications.add(notif);
+        }
     }
 }

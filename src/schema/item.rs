@@ -1,9 +1,11 @@
 use core::fmt;
 
+use rustix::path::Arg;
+use slug::slugify;
 use sqlx::types::chrono::{DateTime, Utc};
 
 use crate::{
-    metadata::common_metadata::ItemMetadata,
+    metadata::common_metadata::{ItemMetadata, ItemType},
     schema::{author::Author, tag::Tag},
 };
 
@@ -29,6 +31,25 @@ impl fmt::Display for DatabaseItem {
         str.push_str(&format!("Created At: {}\n", self.created_at));
         str.push_str(&format!("Updated At: {}\n", self.updated_at));
         write!(f, "{str}")
+    }
+}
+
+impl DatabaseItem {
+    pub fn to_bibtex(&self) -> String {
+        let mut bibtex = String::new();
+        // TODO: use the standard for the cite key: first author last name + year
+        match ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::Misc) {
+            ItemType::Book => {
+                bibtex.push_str(&format!("@book{{{},\n", slugify(&self.fields.title)));
+            }
+            ItemType::Article => {
+                bibtex.push_str(&format!("@article{{{},\n", slugify(&self.fields.title)));
+            }
+            _ => {
+                bibtex.push_str(&format!("@misc{{{},\n", slugify(&self.fields.title)));
+            }
+        }
+        bibtex
     }
 }
 
