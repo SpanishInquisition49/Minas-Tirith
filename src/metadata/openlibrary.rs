@@ -9,9 +9,7 @@ use crate::metadata::{
 };
 
 #[derive(Clone, Debug)]
-pub struct OpenLibraryManager {
-    client: Client,
-}
+pub struct OpenLibraryManager {}
 
 #[derive(Debug, Deserialize)]
 struct OpenLibraryResponse {
@@ -87,19 +85,19 @@ impl ItemMetadata for OpenLibraryItem {
 
 impl OpenLibraryManager {
     pub fn new() -> Self {
-        Self {
-            client: Client::new(),
-        }
+        Self {}
     }
 }
 
-impl MetadataFetcher<OpenLibraryItem> for OpenLibraryManager {
-    const BASE_URL: &str = "https://openlibrary.org/search.json";
-
-    async fn fetch(&self, title: &str) -> color_eyre::Result<Vec<OpenLibraryItem>> {
-        let res = self
-            .client
-            .get(Self::BASE_URL)
+impl MetadataFetcher for OpenLibraryManager {
+    async fn fetch(
+        &self,
+        client: &Client,
+        title: &str,
+    ) -> color_eyre::Result<Vec<OpenLibraryItem>> {
+        const BASE_URL: &str = "https://openlibrary.org/search.json";
+        let res = client
+            .get(BASE_URL)
             .query(&[("title", title), ("limit", "5")])
             .send()
             .await
@@ -110,4 +108,6 @@ impl MetadataFetcher<OpenLibraryItem> for OpenLibraryManager {
 
         Ok(items)
     }
+
+    type Item = OpenLibraryItem;
 }

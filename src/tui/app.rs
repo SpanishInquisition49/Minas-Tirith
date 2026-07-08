@@ -23,7 +23,7 @@ use crate::{
     database::archive::Archive,
     metadata::{
         common_metadata::ItemMetadata, cover_generator::generate_cover, crosseref::CrossrefManager,
-        image_cache::ImageCache, openlibrary::OpenLibraryManager, proxy::MetadataFetcher,
+        facade::MetadataProvider, image_cache::ImageCache, openlibrary::OpenLibraryManager,
     },
     schema::{
         form::MetadataForm,
@@ -64,8 +64,7 @@ pub struct App {
     pub tick_counter: usize,
     pub is_searching: bool,
 
-    openlibrary: Arc<OpenLibraryManager>,
-    crossref: Arc<CrossrefManager>,
+    metadata_provider: Arc<MetadataProvider>,
     candidate_path: Option<PathBuf>,
     picker: Arc<Picker>,
     cache: Arc<ImageCache>,
@@ -116,8 +115,7 @@ impl App {
             quit: false,
             covers: HashMap::new(),
             pending_covers: HashSet::new(),
-            crossref: Arc::new(CrossrefManager::new()),
-            openlibrary: Arc::new(OpenLibraryManager::new()),
+            metadata_provider: Arc::new(MetadataProvider::new()),
             metadata_candidates: Vec::new(),
             metadata_list_state: ListState::default(),
             candidate_path: None,
@@ -276,27 +274,9 @@ impl App {
 
         self.is_searching = true;
         let tx = self.task_channel_tx.clone();
-        let openlibrary = self.openlibrary.clone();
-        let crossref = self.crossref.clone();
+        let metadata_provider = self.metadata_provider.clone();
         tokio::spawn(async move {
-            let mut candidates: Vec<Box<dyn ItemMetadata>> = Vec::new();
-            let books = openlibrary.fetch(&filename).await;
-            if let Ok(books) = books {
-                candidates.extend(
-                    books
-                        .into_iter()
-                        .map(|b| Box::new(b) as Box<dyn ItemMetadata>),
-                );
-            }
-
-            let articles = crossref.fetch(&filename).await;
-            if let Ok(articles) = articles {
-                candidates.extend(
-                    articles
-                        .into_iter()
-                        .map(|a| Box::new(a) as Box<dyn ItemMetadata>),
-                );
-            }
+            let candidates = metadata_provider.fetch(&filename).await;
             let _ = tx.send(Message::Metadata(candidates));
         });
     }

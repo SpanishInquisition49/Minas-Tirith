@@ -114,25 +114,19 @@ impl ItemMetadata for CrossrefItem {
 }
 
 #[derive(Clone, Debug)]
-pub struct CrossrefManager {
-    client: Client,
-}
+pub struct CrossrefManager {}
 
 impl CrossrefManager {
     pub fn new() -> Self {
-        Self {
-            client: Client::new(),
-        }
+        Self {}
     }
 }
 
-impl MetadataFetcher<CrossrefItem> for CrossrefManager {
-    const BASE_URL: &str = "https://api.crossref.org/works/";
-
-    async fn fetch(&self, title: &str) -> color_eyre::Result<Vec<CrossrefItem>> {
-        let res = self
-            .client
-            .get(Self::BASE_URL)
+impl MetadataFetcher for CrossrefManager {
+    async fn fetch(&self, client: &Client, title: &str) -> color_eyre::Result<Vec<CrossrefItem>> {
+        let base_url: &str = "https://api.crossref.org/works/";
+        let res = client
+            .get(base_url)
             .query(&[("query.title", title), ("rows", "5")])
             .send()
             .await
@@ -146,4 +140,6 @@ impl MetadataFetcher<CrossrefItem> for CrossrefManager {
             .collect();
         Ok(items)
     }
+
+    type Item = CrossrefItem;
 }

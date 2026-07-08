@@ -1,17 +1,36 @@
 use reqwest::Client;
 
-use crate::metadata::{common_metadata::ItemMetadata, proxy::MetadataFetcher};
+use crate::metadata::{
+    common_metadata::ItemMetadata, crosseref::CrossrefManager, openlibrary::OpenLibraryManager,
+    proxy::GenericMetadataFetcher,
+};
 
-#[derive(Clone, Debug)]
-pub struct MetadataProvider<T: ItemMetadata + Sized> {
+/// Facade that hides all the metadata providers, aggregate their results
+/// with a generic simple API
+pub struct MetadataProvider {
     client: Client,
-    providers: Vec<Box<dyn MetadataFetcher<T>>>,
+    providers: Vec<Box<dyn GenericMetadataFetcher>>,
 }
 
 impl MetadataProvider {
-    pub fn new() {}
+    pub fn new() -> Self {
+        Self {
+            client: Client::new(),
+            providers: vec![
+                Box::new(OpenLibraryManager::new()),
+                Box::new(CrossrefManager::new()),
+            ],
+        }
+    }
 
     pub async fn fetch(&self, title: &str) -> Vec<Box<dyn ItemMetadata>> {
-        vec![]
+        let mut res = Vec::new();
+        for provider in &self.providers {
+            let request = provider.fetch_metadata(&self.client, title);
+            if let Ok(metadata) = request.await {
+                res.extend(metadata)
+            }
+        }
+        res
     }
 }
