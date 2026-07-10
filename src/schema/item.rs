@@ -35,20 +35,95 @@ impl fmt::Display for DatabaseItem {
 
 impl DatabaseItem {
     pub fn to_bibtex(&self) -> String {
-        let mut bibtex = String::new();
-        // TODO: use the standard for the cite key: first author last name + year
-        match ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::Misc) {
+        let item_type = ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::Misc);
+        let key = self.cite_key();
+        let year = self.year();
+        let authors = self.autors_bibtex();
+        let mut fields: Vec<(&str, Option<String>)> = vec![
+            ("title", Some(format!("{{{}}}", self.fields.title))),
+            ("authors", authors),
+            ("year", year),
+            ("doi", self.fields.doi.clone()),
+        ];
+
+        let entry_type = match item_type {
             ItemType::Book => {
-                bibtex.push_str(&format!("@book{{{},\n", slugify(&self.fields.title)));
+                fields.push(("publisher", self.fields.container.clone()));
+                fields.push(("isbn", self.fields.isbn.clone()));
+                "book"
             }
             ItemType::Article => {
-                bibtex.push_str(&format!("@article{{{},\n", slugify(&self.fields.title)));
+                fields.push(("journal", self.fields.container.clone()));
+                "article"
             }
-            _ => {
-                bibtex.push_str(&format!("@misc{{{},\n", slugify(&self.fields.title)));
+            ItemType::Report => {
+                fields.push(("institution", self.fields.container.clone()));
+                "techreport"
+            }
+            ItemType::Thesis => {
+                fields.push(("school", self.fields.container.clone()));
+                "phdthesis"
+            }
+            ItemType::Misc => {
+                fields.push(("howpublished", self.fields.container.clone()));
+                fields.push(("note", self.fields.description.clone()));
+                "misc"
+            }
+        };
+
+        let mut bibtex = format!("@{entry_type}{{{key},\n");
+        for (name, value) in fields {
+            if let Some(v) = value {
+                bibtex.push_str(&format!("\t{name} = {{{v}}},\n"));
             }
         }
+        bibtex.push_str("}\n");
         bibtex
+    }
+
+    fn autors_bibtex(&self) -> Option<String> {
+        if self.authors.is_empty() {
+            None
+        } else {
+            Some(
+                self.authors
+                    .iter()
+                    .map(|a| a.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(" and "),
+            )
+        }
+    }
+
+    fn year(&self) -> Option<String> {
+        self.fields
+            .publication_date
+            .as_ref()
+            .and_then(|d| d.split(['-', '/']).next())
+            .filter(|s| s.chars().all(|c| c.is_ascii_digit()) && s.len() == 4)
+            .map(str::to_string)
+    }
+
+    fn cite_key(&self) -> String {
+        let author_last_name = self
+            .authors
+            .first()
+            .map(|a| slugify(Self::last_name(&a.name)))
+            .filter(|s| !s.is_empty());
+
+        match (author_last_name, self.year()) {
+            (Some(a), Some(y)) => format!("{a}{y}"),
+            (Some(a), None) => a,
+            (None, _) => slugify(&self.fields.title),
+        }
+    }
+
+    fn last_name(full_name: &str) -> String {
+        full_name
+            .split_whitespace()
+            .last()
+            .unwrap_or(full_name)
+            .to_string()
     }
 }
 
