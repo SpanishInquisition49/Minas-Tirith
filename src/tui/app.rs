@@ -22,8 +22,8 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use crate::{
     database::archive::Archive,
     metadata::{
-        common_metadata::ItemMetadata, cover_generator::generate_cover, crosseref::CrossrefManager,
-        facade::MetadataProvider, image_cache::ImageCache, openlibrary::OpenLibraryManager,
+        common_metadata::ItemMetadata, cover_generator::generate_cover, facade::MetadataProvider,
+        image_cache::ImageCache,
     },
     schema::{
         form::MetadataForm,
@@ -450,7 +450,7 @@ impl App {
         };
         let bibtex = item.to_bibtex();
         let mut ctx = ClipboardContext::new().unwrap();
-        ctx.set_contents(bibtex.to_owned());
+        let _ = ctx.set_contents(bibtex.to_owned());
         if let Ok(notif) = Notification::new("Copied Bibtex")
             .title("  Info ")
             .timing(

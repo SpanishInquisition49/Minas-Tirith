@@ -1,6 +1,5 @@
 use color_eyre::eyre::Context;
 use reqwest::Client;
-use slug::slugify;
 
 use crate::metadata::{
     common_metadata::{ItemMetadata, ItemType},
@@ -29,6 +28,8 @@ pub struct CrossrefItem {
     #[serde(rename = "type", default)]
     work_type: String,
     issued: Option<CrossrefDate>,
+    #[serde(rename = "container-title", default)]
+    container_title: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,7 +48,7 @@ impl ItemMetadata for CrossrefItem {
         self.title.clone().into_iter().next().unwrap_or_default()
     }
 
-    fn item_type(&self) -> super::common_metadata::ItemType {
+    fn item_type(&self) -> ItemType {
         match self.work_type.as_str() {
             "journal-article" | "proceedings-article" | "conference-paper" => ItemType::Article,
             "book" | "monograph" | "edited-book" => ItemType::Book,
@@ -104,12 +105,12 @@ impl ItemMetadata for CrossrefItem {
         None
     }
 
-    fn slug(&self) -> String {
-        slugify(self.title())
-    }
-
     fn tags(&self) -> Vec<String> {
         vec![]
+    }
+
+    fn container(&self) -> Option<String> {
+        self.container_title.first().cloned()
     }
 }
 

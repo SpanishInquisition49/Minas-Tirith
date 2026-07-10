@@ -1,6 +1,7 @@
 use core::fmt;
 
 use color_eyre::eyre::eyre;
+use slug::slugify;
 
 /// Common interface for metadata from various providers
 pub trait ItemMetadata: Send {
@@ -12,9 +13,19 @@ pub trait ItemMetadata: Send {
     fn doi(&self) -> Option<String>;
     fn publication_date(&self) -> Option<String>;
     fn cover_image_url(&self) -> Option<String>;
-    fn slug(&self) -> String;
     fn source(&self) -> String;
     fn tags(&self) -> Vec<String>;
+
+    fn slug(&self) -> String {
+        slugify(self.title())
+    }
+
+    /// Name of the conference/magazine for articles, editor for books
+    /// and institution/university for thesis and report.
+    /// `None` if provider doesn't expose those informations
+    fn container(&self) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Debug, Clone)]

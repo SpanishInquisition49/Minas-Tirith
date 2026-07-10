@@ -1,6 +1,5 @@
 use core::fmt;
 
-use rustix::path::Arg;
 use slug::slugify;
 use sqlx::types::chrono::{DateTime, Utc};
 
@@ -63,6 +62,7 @@ pub struct Item {
     pub publication_date: Option<String>,
     pub slug: String,
     pub cover_image_url: Option<String>,
+    pub container: Option<String>,
 }
 
 impl fmt::Display for Item {
@@ -102,6 +102,7 @@ impl<T: ItemMetadata + Sized> From<&T> for Item {
             publication_date: value.publication_date(),
             slug: value.slug(),
             cover_image_url: value.cover_image_url(),
+            container: value.container(),
         }
     }
 }

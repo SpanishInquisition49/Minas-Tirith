@@ -1,7 +1,6 @@
 use color_eyre::eyre::Context;
 use reqwest::Client;
 use serde::Deserialize;
-use slug::slugify;
 
 use crate::metadata::{
     common_metadata::{ItemMetadata, ItemType},
@@ -72,10 +71,6 @@ impl ItemMetadata for OpenLibraryItem {
 
     fn description(&self) -> Option<String> {
         None
-    }
-
-    fn slug(&self) -> String {
-        slugify(&self.title)
     }
 
     fn tags(&self) -> Vec<String> {

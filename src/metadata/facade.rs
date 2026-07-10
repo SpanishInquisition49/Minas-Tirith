@@ -1,7 +1,10 @@
 use reqwest::Client;
 
 use crate::metadata::{
-    common_metadata::ItemMetadata, crosseref::CrossrefManager, openlibrary::OpenLibraryManager,
+    common_metadata::ItemMetadata,
+    providers::{
+        crosseref::CrossrefManager, openalex::OpenAlexManager, openlibrary::OpenLibraryManager,
+    },
     proxy::GenericMetadataFetcher,
 };
 
@@ -19,6 +22,7 @@ impl MetadataProvider {
             providers: vec![
                 Box::new(OpenLibraryManager::new()),
                 Box::new(CrossrefManager::new()),
+                Box::new(OpenAlexManager::new()),
             ],
         }
     }
