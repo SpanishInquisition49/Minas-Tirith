@@ -1,5 +1,6 @@
 use core::fmt;
 
+use human_name::Name;
 use slug::slugify;
 use sqlx::types::chrono::{DateTime, Utc};
 
@@ -40,7 +41,7 @@ impl DatabaseItem {
         let year = self.year();
         let authors = self.autors_bibtex();
         let mut fields: Vec<(&str, Option<String>)> = vec![
-            ("title", Some(format!("{{{}}}", self.fields.title))),
+            ("title", Some(Self::escape_bibtex(&self.fields.title))),
             ("authors", authors),
             ("year", year),
             ("doi", self.fields.doi.clone()),
@@ -66,7 +67,10 @@ impl DatabaseItem {
             }
             ItemType::Misc => {
                 fields.push(("howpublished", self.fields.container.clone()));
-                fields.push(("note", self.fields.description.clone()));
+                fields.push((
+                    "note",
+                    self.fields.description.as_deref().map(Self::escape_bibtex),
+                ));
                 "misc"
             }
         };
@@ -79,6 +83,23 @@ impl DatabaseItem {
         }
         bibtex.push_str("}\n");
         bibtex
+    }
+
+    fn escape_bibtex(value: &str) -> String {
+        let mut out = String::with_capacity(value.len());
+        for c in value.chars() {
+            match c {
+                '$' | '&' | '%' | '#' | '_' | '{' | '}' => {
+                    out.push('\\');
+                    out.push(c);
+                }
+                '~' => out.push_str("\\textasciitilde{}"),
+                '^' => out.push_str("\\textasciicircum{}"),
+                '\\' => out.push_str("\\textasciibackslash"),
+                _ => out.push(c),
+            }
+        }
+        out
     }
 
     fn autors_bibtex(&self) -> Option<String> {
@@ -108,7 +129,16 @@ impl DatabaseItem {
         let author_last_name = self
             .authors
             .first()
-            .map(|a| slugify(Self::last_name(&a.name)))
+            .map(|a| {
+                a.family_name.clone().unwrap_or_else(|| {
+                    let Some(parsed) = Name::parse(&a.name) else {
+                        // NOTE: if everything fails use the full name of the author
+                        return a.name.clone();
+                    };
+                    parsed.surnames().join(" ")
+                })
+            })
+            .map(slugify)
             .filter(|s| !s.is_empty());
 
         match (author_last_name, self.year()) {
@@ -116,14 +146,6 @@ impl DatabaseItem {
             (Some(a), None) => a,
             (None, _) => slugify(&self.fields.title),
         }
-    }
-
-    fn last_name(full_name: &str) -> String {
-        full_name
-            .split_whitespace()
-            .last()
-            .unwrap_or(full_name)
-            .to_string()
     }
 }
 

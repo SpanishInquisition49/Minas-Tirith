@@ -11,6 +11,8 @@ pub struct Author {
     pub name: String,
     pub slug: String,
     pub bio: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

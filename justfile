@@ -9,3 +9,6 @@ install:
 
 check:
   cargo clippy -- -A clippy::pedantic
+
+clean:
+  rm ~/.local/share/minastirith/minastirith.db

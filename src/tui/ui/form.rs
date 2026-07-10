@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Padding, Paragraph},
 };
 
-use crate::{schema::form::FIELD_LABELS, tui::app::App};
+use crate::{metadata::common_metadata::ItemMetadata, schema::form::FIELD_LABELS, tui::app::App};
 
 pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     let center = f
@@ -76,6 +76,10 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         "Type: ".bold(),
         form.item_type.to_string().into(),
         " (press 't' to cylce)".dim(),
+    ]));
+    lines.push(Line::from(vec![
+        "Container: ".bold(),
+        form.container().unwrap_or_default().into(),
     ]));
     lines.push(Line::raw(""));
     for (i, label) in FIELD_LABELS.iter().enumerate() {

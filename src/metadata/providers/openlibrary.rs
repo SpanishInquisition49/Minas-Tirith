@@ -23,6 +23,8 @@ pub struct OpenLibraryItem {
     #[serde(rename = "cover_i")]
     cover_url: Option<i64>,
     ia: Option<Vec<String>>,
+    #[serde(default)]
+    publisher: Vec<String>,
 }
 
 impl ItemMetadata for OpenLibraryItem {
@@ -75,6 +77,10 @@ impl ItemMetadata for OpenLibraryItem {
 
     fn tags(&self) -> Vec<String> {
         vec![]
+    }
+
+    fn container(&self) -> Option<String> {
+        self.publisher.first().cloned()
     }
 }
 

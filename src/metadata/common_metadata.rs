@@ -1,6 +1,7 @@
 use core::fmt;
 
 use color_eyre::eyre::eyre;
+use human_name::Name;
 use slug::slugify;
 
 /// Common interface for metadata from various providers
@@ -15,16 +16,30 @@ pub trait ItemMetadata: Send {
     fn cover_image_url(&self) -> Option<String>;
     fn source(&self) -> String;
     fn tags(&self) -> Vec<String>;
+    fn container(&self) -> Option<String>;
 
     fn slug(&self) -> String {
         slugify(self.title())
     }
 
-    /// Name of the conference/magazine for articles, editor for books
-    /// and institution/university for thesis and report.
-    /// `None` if provider doesn't expose those informations
-    fn container(&self) -> Option<String> {
-        None
+    fn authors_structured(&self) -> Vec<AuthorInput> {
+        self.authors()
+            .into_iter()
+            .map(|full_name| {
+                let parsed = Name::parse(&full_name);
+                AuthorInput {
+                    given_name: parsed
+                        .as_ref()
+                        .and_then(|n| n.given_name())
+                        .map(&str::to_string),
+                    family_name: parsed
+                        .as_ref()
+                        .map(|n| n.surnames().join(" "))
+                        .filter(|s| !s.is_empty()),
+                    full_name,
+                }
+            })
+            .collect()
     }
 }
 
@@ -62,4 +77,11 @@ impl fmt::Display for ItemType {
             ItemType::Misc => write!(f, "misc"),
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct AuthorInput {
+    pub full_name: String,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
 }

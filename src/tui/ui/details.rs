@@ -8,23 +8,25 @@ use ratatui::{
 };
 use ratatui_image::StatefulImage;
 
-use crate::{schema::graphics::Spannable, tui::app::App};
+use crate::{metadata::common_metadata::ItemType, schema::graphics::Spannable, tui::app::App};
 
 pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let title = Line::from(" Details ".yellow().bold().italic());
-    let block = Block::default()
+    let mut block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::THICK)
         .border_style(Style::default().blue())
         .padding(Padding::uniform(1))
         .title(title);
     let inner = block.inner(area);
-    f.render_widget(block, area);
 
     let Some(item) = app.selected_item() else {
+        f.render_widget(block, area);
         f.render_widget(Paragraph::new("No selected item".yellow()), inner);
         return;
     };
+    block = block.title(format!(" {} ", item.fields.title).yellow().italic().bold());
+    f.render_widget(block, area);
 
     let cols = Layout::default()
         .direction(Direction::Horizontal)
@@ -32,23 +34,11 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         .spacing(2)
         .split(inner);
 
+    let item_type = ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::Misc);
     let has_cover_url = item.fields.cover_image_url.is_some();
     let titles_style = Style::new().bold().dark_gray();
     let text_width = cols[1].width;
-    let mut card = vec![
-        Line::from(vec![
-            "Title: ".bold().style(titles_style),
-            item.fields.title.to_string().into(),
-        ]),
-        Line::from(vec![
-            "Type: ".bold().style(titles_style),
-            item.fields.r#type.to_string().into(),
-        ]),
-    ];
-    card.push(Line::from(Span::styled(
-        symbols::DOT.repeat(text_width as usize),
-        Style::default().dark_gray(),
-    )));
+    let mut card = vec![];
     card.push(Line::from("Authors:\n".bold().style(titles_style)));
     let authors_pills: Vec<(usize, Span<'static>)> = item
         .authors
@@ -60,19 +50,39 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         symbols::DOT.repeat(text_width as usize),
         Style::default().dark_gray(),
     )));
-    if let Some(date) = item.fields.publication_date.clone() {
+    card.push(Line::from(vec![
+        "Type: ".bold().style(titles_style),
+        item.fields.r#type.to_string().into(),
+    ]));
+    if let Some(container) = &item.fields.container {
+        let name = match item_type {
+            ItemType::Book => "Publisher: ",
+            ItemType::Article => "Journal: ",
+            ItemType::Report => "Institution: ",
+            ItemType::Thesis => "University: ",
+            ItemType::Misc => "How Published: ",
+        };
+        card.extend(wrap_labeled_field(
+            name,
+            container,
+            text_width,
+            Style::default().bold().dark_gray(),
+        ));
+    }
+
+    if let Some(date) = &item.fields.publication_date {
         card.push(Line::from(vec![
             "Publication Date: ".bold().style(titles_style),
             date.into(),
         ]));
     }
-    if let Some(doi) = item.fields.doi.clone() {
+    if let Some(doi) = &item.fields.doi {
         card.push(Line::from(vec![
             "DOI: ".bold().style(titles_style),
             doi.into(),
         ]));
     }
-    if let Some(isbn) = item.fields.isbn.clone() {
+    if let Some(isbn) = &item.fields.isbn {
         card.push(Line::from(vec![
             "ISBN: ".bold().style(titles_style),
             isbn.into(),
@@ -89,8 +99,8 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         card.push(Line::from(tags));
     }
 
-    draw_cover_slot(f, app, cols[0], has_cover_url);
     f.render_widget(Paragraph::new(card), cols[1]);
+    draw_cover_slot(f, app, cols[0], has_cover_url);
 }
 
 fn wrap_pills(pills: Vec<(usize, Span<'static>)>, max_width: u16) -> Vec<Line<'static>> {
@@ -113,6 +123,58 @@ fn wrap_pills(pills: Vec<(usize, Span<'static>)>, max_width: u16) -> Vec<Line<'s
         lines.push(Line::from(current));
     }
     lines
+}
+
+fn wrap_labeled_field(
+    label: &str,
+    value: &str,
+    width: u16,
+    label_style: Style,
+) -> Vec<Line<'static>> {
+    let width = width as usize;
+    let indent_width = label.chars().count();
+    let content_width = width.saturating_sub(indent_width).max(1);
+
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current = String::new();
+
+    for word in value.split_whitespace() {
+        let candidate_len = if current.is_empty() {
+            word.chars().count()
+        } else {
+            current.chars().count() + 1 + word.chars().count()
+        };
+
+        if candidate_len > content_width && !current.is_empty() {
+            chunks.push(std::mem::take(&mut current));
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
+    }
+    if !current.is_empty() {
+        chunks.push(current);
+    }
+    if chunks.is_empty() {
+        chunks.push(String::new());
+    }
+
+    let indent = " ".repeat(indent_width);
+    chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, chunk)| {
+            if i == 0 {
+                Line::from(vec![
+                    Span::styled(label.to_string(), label_style),
+                    chunk.into(),
+                ])
+            } else {
+                Line::from(vec![Span::raw(indent.clone()), chunk.into()])
+            }
+        })
+        .collect()
 }
 
 fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool) {

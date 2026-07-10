@@ -2,7 +2,7 @@ use color_eyre::eyre::Context;
 use reqwest::Client;
 
 use crate::metadata::{
-    common_metadata::{ItemMetadata, ItemType},
+    common_metadata::{AuthorInput, ItemMetadata, ItemType},
     proxy::MetadataFetcher,
 };
 
@@ -107,6 +107,25 @@ impl ItemMetadata for CrossrefItem {
 
     fn tags(&self) -> Vec<String> {
         vec![]
+    }
+
+    fn authors_structured(&self) -> Vec<AuthorInput> {
+        let Some(authors) = &self.author else {
+            return vec![];
+        };
+        authors
+            .iter()
+            .map(|a| {
+                let given = a.given.clone().unwrap_or_default();
+                let family = a.family.clone().unwrap_or_default();
+                let full_name = format!("{given} {family}").trim().to_string();
+                AuthorInput {
+                    given_name: Some(given).filter(|g| !g.is_empty()),
+                    family_name: Some(family).filter(|f| !f.is_empty()),
+                    full_name,
+                }
+            })
+            .collect()
     }
 
     fn container(&self) -> Option<String> {

@@ -29,6 +29,7 @@ pub struct MetadataForm {
     pub authors: Vec<String>,
     pub field_index: usize,
     pub editing: bool,
+    pub container: Option<String>,
 }
 
 impl ItemMetadata for MetadataForm {
@@ -75,6 +76,10 @@ impl ItemMetadata for MetadataForm {
     fn tags(&self) -> Vec<String> {
         self.tags_vec()
     }
+
+    fn container(&self) -> Option<String> {
+        self.container.clone()
+    }
 }
 
 impl MetadataForm {
@@ -91,6 +96,7 @@ impl MetadataForm {
             authors: Vec::new(),
             field_index: 0,
             editing: false,
+            container: None,
         }
     }
 
@@ -107,6 +113,7 @@ impl MetadataForm {
             authors: candidate.authors(),
             field_index: 0,
             editing: false,
+            container: candidate.container(),
         }
     }
 
@@ -135,6 +142,7 @@ impl MetadataForm {
             authors: item.authors.iter().map(|a| a.name.clone()).collect(),
             field_index: 0,
             editing: false,
+            container: item.fields.container.clone(),
         }
     }
 
