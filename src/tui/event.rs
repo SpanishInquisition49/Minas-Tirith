@@ -54,6 +54,8 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
 async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
     match app.mode {
         Mode::Normal => match key.code {
+            KeyCode::Char('[') => app.tabs_prev(),
+            KeyCode::Char(']') => app.tabs_next(),
             KeyCode::Char('q') => app.quit = true,
             KeyCode::Char('j') | KeyCode::Down => app.select_next(),
             KeyCode::Char('k') | KeyCode::Up => app.select_prev(),

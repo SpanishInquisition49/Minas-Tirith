@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use reqwest::Client;
 
 use crate::metadata::{
@@ -5,35 +7,40 @@ use crate::metadata::{
     providers::{
         crosseref::CrossrefManager, openalex::OpenAlexManager, openlibrary::OpenLibraryManager,
     },
-    proxy::GenericMetadataFetcher,
+    proxy::MetadataFetcher,
 };
 
 /// Facade that hides all the metadata providers, aggregate their results
 /// with a generic simple API
 pub struct MetadataProvider {
-    client: Client,
-    providers: Vec<Box<dyn GenericMetadataFetcher>>,
+    client: Arc<Client>,
+    providers: Vec<Arc<dyn MetadataFetcher>>,
 }
 
 impl MetadataProvider {
     pub fn new() -> Self {
         Self {
-            client: Client::new(),
+            client: Arc::new(Client::new()),
             providers: vec![
-                Box::new(OpenLibraryManager::new()),
-                Box::new(CrossrefManager::new()),
-                Box::new(OpenAlexManager::new()),
+                Arc::new(OpenLibraryManager::new()),
+                Arc::new(CrossrefManager::new()),
+                Arc::new(OpenAlexManager::new()),
             ],
         }
     }
 
     pub async fn fetch(&self, title: &str) -> Vec<Box<dyn ItemMetadata>> {
         let mut res = Vec::new();
-        for provider in &self.providers {
-            let request = provider.fetch_metadata(&self.client, title);
-            if let Ok(metadata) = request.await {
-                res.extend(metadata)
-            }
+        let mut tasks = tokio::task::JoinSet::new();
+        for provider in self.providers.iter() {
+            let client = self.client.clone();
+            let title = title.to_string();
+            let p = provider.clone();
+            tasks.spawn(async move { p.fetch(client, title).await });
+        }
+
+        for metadatas in tasks.join_all().await.into_iter().flatten() {
+            res.extend(metadatas);
         }
         res
     }

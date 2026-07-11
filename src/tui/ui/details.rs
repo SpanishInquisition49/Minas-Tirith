@@ -34,7 +34,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         .spacing(2)
         .split(inner);
 
-    let item_type = ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::Misc);
+    let item_type = ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::default());
     let has_cover_url = item.fields.cover_image_url.is_some();
     let titles_style = Style::new().bold().dark_gray();
     let text_width = cols[1].width;

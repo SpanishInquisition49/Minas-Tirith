@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
 use color_eyre::eyre::Context;
 use reqwest::Client;
 use serde::Deserialize;
@@ -90,25 +93,28 @@ impl OpenLibraryManager {
     }
 }
 
+#[async_trait]
 impl MetadataFetcher for OpenLibraryManager {
     async fn fetch(
         &self,
-        client: &Client,
-        title: &str,
-    ) -> color_eyre::Result<Vec<OpenLibraryItem>> {
+        client: Arc<Client>,
+        title: String,
+    ) -> color_eyre::Result<Vec<Box<dyn ItemMetadata>>> {
         const BASE_URL: &str = "https://openlibrary.org/search.json";
         let res = client
             .get(BASE_URL)
-            .query(&[("title", title), ("limit", "5")])
+            .query(&[("title", title), ("limit", "5".to_string())])
             .send()
             .await
             .context("Open Library API call")?;
 
         let parsed: OpenLibraryResponse = res.json().await.context("Open Library JSON parsing")?;
-        let items = parsed.docs;
+        let items = parsed
+            .docs
+            .into_iter()
+            .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
+            .collect();
 
         Ok(items)
     }
-
-    type Item = OpenLibraryItem;
 }

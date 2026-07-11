@@ -22,7 +22,9 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use crate::{
     database::archive::Archive,
     metadata::{
-        common_metadata::ItemMetadata, cover_generator::generate_cover, facade::MetadataProvider,
+        common_metadata::{ItemMetadata, ItemType},
+        cover_generator::generate_cover,
+        facade::MetadataProvider,
         image_cache::ImageCache,
     },
     schema::{
@@ -45,12 +47,15 @@ pub enum EditContext {
     ExistingItem { id: i32 },
 }
 
+pub const TABS_LABELS: [&str; 6] = ["All", "Book", "Article", "Thesis", "Report", "Misc"];
+
 pub struct App {
     pub notifications: Notifications,
     pub archive: Arc<Archive>,
     pub mode: Mode,
     pub items: Vec<DatabaseItem>,
     pub items_list_state: ListState,
+    pub selectd_tab: usize,
     //pub search_query: String,
     pub quit: bool,
     pub file_explorer: FileExplorer,
@@ -127,10 +132,27 @@ impl App {
             is_searching: false,
             task_channel_tx: Arc::new(task_channel_tx),
             task_channel_rx,
+            selectd_tab: 0,
         };
         app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
         Ok(app)
+    }
+
+    pub fn tabs_prev(&mut self) {
+        self.selectd_tab = if self.selectd_tab == 0 {
+            TABS_LABELS.len() - 1
+        } else {
+            self.selectd_tab - 1
+        };
+    }
+
+    pub fn tabs_next(&mut self) {
+        self.selectd_tab = if self.selectd_tab + 1 == TABS_LABELS.len() {
+            0
+        } else {
+            self.selectd_tab + 1
+        };
     }
 
     pub fn select_prev(&mut self) {
@@ -151,10 +173,32 @@ impl App {
         self.items_list_state.select(Some(i));
     }
 
+    pub fn keep_items(&self, item: &DatabaseItem) -> bool {
+        if self.selectd_tab == 0 {
+            return true;
+        }
+        let Ok(active_item_type) = ItemType::try_from(TABS_LABELS[self.selectd_tab]) else {
+            return true;
+        };
+        let item_type =
+            ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::default());
+        active_item_type == item_type
+    }
+
     pub fn selected_item(&self) -> Option<&DatabaseItem> {
-        self.items_list_state
-            .selected()
-            .and_then(|i| self.items.get(i))
+        let binding = self.items.iter();
+        let filtered_items = binding
+            .as_ref()
+            .iter()
+            .filter(|i| self.keep_items(i))
+            .collect::<Vec<_>>();
+
+        self.items_list_state.selected().and_then(|i| {
+            let selected = filtered_items.get(i)?;
+            self.items
+                .iter()
+                .find(|i| i.fields.slug == selected.fields.slug)
+        })
     }
 
     pub fn request_cover_for_selected(&mut self) {
@@ -274,9 +318,9 @@ impl App {
 
         self.is_searching = true;
         let tx = self.task_channel_tx.clone();
-        let metadata_provider = self.metadata_provider.clone();
+        let provider = self.metadata_provider.clone();
         tokio::spawn(async move {
-            let candidates = metadata_provider.fetch(&filename).await;
+            let candidates = provider.fetch(&filename).await;
             let _ = tx.send(Message::Metadata(candidates));
         });
     }

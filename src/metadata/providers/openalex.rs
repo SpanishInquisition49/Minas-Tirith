@@ -1,5 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use color_eyre::eyre::Context;
 use reqwest::Client;
 use serde::Deserialize;
@@ -17,12 +18,15 @@ impl OpenAlexManager {
     }
 }
 
+#[async_trait]
 impl MetadataFetcher for OpenAlexManager {
-    type Item = OpenAlexItem;
-
-    async fn fetch(&self, client: &Client, title: &str) -> color_eyre::Result<Vec<Self::Item>> {
+    async fn fetch(
+        &self,
+        client: Arc<Client>,
+        title: String,
+    ) -> color_eyre::Result<Vec<Box<dyn ItemMetadata>>> {
         const BASE_URL: &str = "https://api.openalex.org/works";
-        let query = vec![("search", title), ("per-page", "5")];
+        let query = vec![("search", title), ("per-page", "5".to_string())];
         let res = client
             .get(BASE_URL)
             .query(&query)
@@ -31,7 +35,12 @@ impl MetadataFetcher for OpenAlexManager {
             .context("OpenAlex API call")?;
 
         let parsed: OpenAlexResponse = res.json().await.context("OpenAlex JSON parsing")?;
-        Ok(parsed.results)
+        let items = parsed
+            .results
+            .into_iter()
+            .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
+            .collect();
+        Ok(items)
     }
 }
 

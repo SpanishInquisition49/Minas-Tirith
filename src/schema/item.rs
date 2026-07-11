@@ -36,7 +36,8 @@ impl fmt::Display for DatabaseItem {
 
 impl DatabaseItem {
     pub fn to_bibtex(&self) -> String {
-        let item_type = ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::Misc);
+        let item_type =
+            ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::default());
         let key = self.cite_key();
         let year = self.year();
         let authors = self.autors_bibtex();

@@ -118,7 +118,8 @@ impl MetadataForm {
     }
 
     pub fn from_item(item: &DatabaseItem) -> Self {
-        let item_type = ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::Misc);
+        let item_type =
+            ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::default());
         Self {
             title: item.fields.title.clone().into(),
             description: item.fields.description.clone().unwrap_or_default().into(),

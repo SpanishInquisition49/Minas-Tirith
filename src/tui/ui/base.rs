@@ -3,17 +3,17 @@ use ratatui::{
     layout::{
         Constraint,
         Direction::{self, Horizontal},
-        Layout, Rect,
+        Layout, Offset, Rect,
     },
     style::{Modifier, Style, Stylize},
-    symbols::border,
+    symbols::{self, border},
     text::Line,
-    widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph},
+    widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph, Tabs},
 };
 use ratatui_explorer::Theme;
 
 use crate::tui::{
-    app::{App, Mode},
+    app::{App, Mode, TABS_LABELS},
     ui::{details::draw_details, form::draw_metadata_edit_popup},
 };
 
@@ -113,16 +113,26 @@ fn draw_add_popup(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
-    let items: Vec<ListItem> = app
-        .items
-        .iter()
-        .map(|i| ListItem::new(i.fields.title.clone()))
-        .collect();
-
     let index = app.items_list_state.selected().unwrap_or_default() + 1;
     let total = app.items.len();
     let bottom_line = Line::from(format!(" {index} of {total} ").yellow());
-    let title = Line::from(" Tomes ".bold().yellow().italic());
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Max(1), Constraint::Fill(1)])
+        .split(area);
+    let tabs = Tabs::new(TABS_LABELS)
+        .style(Style::default().italic())
+        .highlight_style(Style::default().yellow().underlined().italic().bold())
+        .select(app.selectd_tab)
+        .divider(symbols::DOT)
+        .padding(" ", " ");
+    let items: Vec<ListItem> = app
+        .items
+        .iter()
+        .filter(|i| app.keep_items(i))
+        .map(|i| ListItem::new(i.fields.title.clone()))
+        .collect();
+
     let list = List::new(items)
         .block(
             Block::default()
@@ -130,12 +140,16 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
                 .border_set(border::THICK)
                 .border_style(Style::default().blue())
                 .padding(Padding::uniform(1))
-                .title(title)
                 .title_bottom(bottom_line.right_aligned()),
         )
         .highlight_style(Style::default().green());
 
-    f.render_stateful_widget(list, area, &mut app.items_list_state);
+    f.render_stateful_widget(
+        list,
+        rows[1] + Offset::new(0, -1),
+        &mut app.items_list_state,
+    );
+    f.render_widget(tabs, rows[0] + Offset::new(1, 0));
 }
 
 fn draw_status(f: &mut Frame, area: Rect) {

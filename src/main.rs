@@ -33,7 +33,6 @@ fn get_image_cache_path(proj_dirs: &ProjectDirs) -> PathBuf {
 
 pub async fn init_db(proj_dirs: &ProjectDirs) -> color_eyre::Result<SqlitePool> {
     let db_path = get_db_path(proj_dirs);
-    println!("DB path: {:?}", db_path);
 
     let options = SqliteConnectOptions::from_str(db_path.to_str().unwrap())?
         .create_if_missing(true)

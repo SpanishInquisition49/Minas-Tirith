@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
 use color_eyre::eyre::Context;
 use reqwest::Client;
 
@@ -142,12 +145,17 @@ impl CrossrefManager {
     }
 }
 
+#[async_trait]
 impl MetadataFetcher for CrossrefManager {
-    async fn fetch(&self, client: &Client, title: &str) -> color_eyre::Result<Vec<CrossrefItem>> {
+    async fn fetch(
+        &self,
+        client: Arc<Client>,
+        title: String,
+    ) -> color_eyre::Result<Vec<Box<dyn ItemMetadata>>> {
         let base_url: &str = "https://api.crossref.org/works/";
         let res = client
             .get(base_url)
-            .query(&[("query.title", title), ("rows", "5")])
+            .query(&[("query.title", title), ("rows", "5".to_string())])
             .send()
             .await
             .context("Crosser API call")?;
@@ -157,9 +165,8 @@ impl MetadataFetcher for CrossrefManager {
             .items
             .into_iter()
             .filter(|i| !i.doi.is_empty() && !i.title.is_empty())
+            .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
             .collect();
         Ok(items)
     }
-
-    type Item = CrossrefItem;
 }

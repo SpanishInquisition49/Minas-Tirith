@@ -43,12 +43,13 @@ pub trait ItemMetadata: Send {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub enum ItemType {
     Book,
     Article,
     Report,
     Thesis,
+    #[default]
     Misc,
 }
 
@@ -56,7 +57,7 @@ impl TryFrom<&str> for ItemType {
     type Error = color_eyre::eyre::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(match value {
+        Ok(match value.to_lowercase().as_str() {
             "book" => ItemType::Book,
             "article" => ItemType::Article,
             "report" => ItemType::Report,
