@@ -6,7 +6,7 @@
 
 Minas Tirith is a terminal-first personal reference manager for books, articles, reports, theses, and miscellaneous documents.
 
-It stores metadata in SQLite, fetches candidates from Open Library and Crossref, lets you review/edit metadata before saving, and shows document covers directly in the TUI.
+It stores metadata in SQLite, fetches candidates from Open Library, Crossref, and OpenAlex, lets you review/edit metadata before saving, and shows document covers directly in the TUI.
 
 ## Current capabilities
 
@@ -14,9 +14,12 @@ It stores metadata in SQLite, fetches candidates from Open Library and Crossref,
 - Fetch metadata candidates from:
   - Open Library (`title`, authors, year, ISBN when available, cover URL)
   - Crossref (`title`, authors, DOI, publication date, inferred item type)
+  - OpenAlex (`title`, authors, DOI, publication date, source venue, concepts as tags)
 - Select a candidate, edit metadata, and save to the archive
 - Edit metadata for already-saved publications
 - Open a saved file from the list
+- Copy the selected item's BibTeX entry to the system clipboard
+- Filter the item list by type
 - Display cached/downloaded covers, or generate covers from local files:
   - PDF: first page via `pdftoppm`
   - EPUB: embedded cover via `epub` crate
@@ -26,15 +29,16 @@ It stores metadata in SQLite, fetches candidates from Open Library and Crossref,
 
 ### Normal mode
 
-| Key          | Action                                    |
-| ------------ | ----------------------------------------- |
-| `j` / `Down` | Select next item                          |
-| `k` / `Up`   | Select previous item                      |
-| `a`          | Open file explorer (add flow)             |
-| `e`          | Edit selected item metadata               |
-| `Enter`      | Open selected file with system opener     |
-| `/`          | Enter search mode (currently placeholder) |
-| `q`          | Quit                                      |
+| Key          | Action                                |
+| ------------ | ------------------------------------- |
+| `j` / `Down` | Select next item                      |
+| `k` / `Up`   | Select previous item                  |
+| `[` / `]`    | Switch item type tab                  |
+| `a`          | Open file explorer (add flow)         |
+| `e`          | Edit selected item metadata           |
+| `b`          | Copy selected item as BibTeX          |
+| `Enter`      | Open selected file with system opener |
+| `q`          | Quit                                  |
 
 ### Insert mode (file explorer)
 
@@ -104,11 +108,15 @@ Main table graph:
 ```
 items ──┬── item_authors ──── authors
         ├── item_tags ─────── tags
-        └── item_categories ─ categories
+        └── item_collections ─ collections
 ```
-
-Note: categories exist in schema, but category management is not yet exposed in the UI.
 
 ## Status
 
-This is an early-stage project and APIs/UX are still evolving.
+This is still an early-stage project, but the core add/edit/open flow is functional and persisted through SQLite migrations.
+
+Known limitations right now:
+
+- Search mode is not implemented yet
+- Collections management exists in schema but is not exposed in the UI
+- UX and data model are still evolving
