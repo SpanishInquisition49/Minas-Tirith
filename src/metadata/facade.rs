@@ -5,7 +5,8 @@ use reqwest::Client;
 use crate::metadata::{
     common_metadata::ItemMetadata,
     providers::{
-        crosseref::CrossrefManager, openalex::OpenAlexManager, openlibrary::OpenLibraryManager,
+        self, crosseref::CrossrefManager, openalex::OpenAlexManager,
+        openlibrary::OpenLibraryManager,
     },
     proxy::MetadataFetcher,
 };
@@ -43,5 +44,24 @@ impl MetadataProvider {
             res.extend(metadatas);
         }
         res
+    }
+
+    pub async fn fetch_abstract(
+        &self,
+        title: &str,
+        doi: Option<String>,
+        isbn: Option<String>,
+    ) -> Option<String> {
+        for provider in self.providers.iter() {
+            let client = self.client.clone();
+            if let Ok(Some(text)) = provider
+                .fetch_abstract(client, title.to_string(), doi.clone(), isbn.clone())
+                .await
+                && !text.trim().is_empty()
+            {
+                return Some(text);
+            }
+        }
+        None
     }
 }

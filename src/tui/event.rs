@@ -46,6 +46,7 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
             break;
         } else {
             app.request_cover_for_selected();
+            app.request_abstract_for_selected();
         }
     }
     Ok(())

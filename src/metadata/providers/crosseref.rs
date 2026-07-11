@@ -11,6 +11,11 @@ use crate::metadata::{
 
 use serde::Deserialize;
 
+#[derive(Deserialize, Debug)]
+struct CrossrefWorkResponse {
+    pub message: CrossrefItem,
+}
+
 #[derive(Debug, Deserialize)]
 struct CrossrefResponse {
     message: CrossrefMessage,
@@ -33,6 +38,8 @@ pub struct CrossrefItem {
     issued: Option<CrossrefDate>,
     #[serde(rename = "container-title", default)]
     container_title: Vec<String>,
+    #[serde(rename = "abstract", default)]
+    abstract_text: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,7 +112,10 @@ impl ItemMetadata for CrossrefItem {
     }
 
     fn description(&self) -> Option<String> {
-        None
+        self.abstract_text
+            .as_deref()
+            .map(strip_jats_tags)
+            .filter(|s| !s.is_empty())
     }
 
     fn tags(&self) -> Vec<String> {
@@ -169,4 +179,41 @@ impl MetadataFetcher for CrossrefManager {
             .collect();
         Ok(items)
     }
+
+    async fn fetch_abstract(
+        &self,
+        client: Arc<Client>,
+        _title: String,
+        doi: Option<String>,
+        _isbn: Option<String>,
+    ) -> color_eyre::Result<Option<String>> {
+        let Some(doi) = doi else { return Ok(None) };
+        let url = format!("https://api.crossref.org/works/{doi}");
+        let res = client
+            .get(&url)
+            .send()
+            .await
+            .context("Crossref DOI lookup")?;
+        if !res.status().is_success() {
+            Ok(None)
+        } else {
+            let parsed: CrossrefWorkResponse =
+                res.json().await.context("Crossref DOI json parsing")?;
+            Ok(parsed.message.description())
+        }
+    }
+}
+
+fn strip_jats_tags(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut in_tag = false;
+    for c in input.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(c),
+            _ => {}
+        }
+    }
+    out
 }

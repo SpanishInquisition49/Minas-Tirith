@@ -31,6 +31,7 @@ impl Archive {
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url, path, container)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = excluded.slug, container = COALESCE(excluded.container, container) RETURNING id
 ";
+    const SET_ITEM_DESCRIPTION: &str = "UPDATE items SET description = ? WHERE id = ?";
     const ADD_AUTHOR: &str = "INSERT INTO authors (name, slug, given_name, family_name) VALUES (?,?,?,?) ON CONFLICT DO UPDATE SET slug = excluded.slug, given_name = excluded.given_name, family_name = excluded.given_name RETURNING id";
     const ADD_ITEM_AUTHOR: &str = "INSERT INTO item_authors (item_id, author_id, author_order) VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
     const SET_COVER_IMAGE_URL: &str = "UPDATE items SET cover_image_url = ? WHERE id = ?;";
@@ -199,6 +200,20 @@ WHERE id = ?
         Self::sync_tags(&mut txn, item_id, &form.tags()).await?;
 
         txn.commit().await.context("Commit item update")?;
+        Ok(())
+    }
+
+    pub async fn set_item_description(
+        &self,
+        item_id: i32,
+        description: &str,
+    ) -> color_eyre::Result<()> {
+        sqlx::query(Self::SET_ITEM_DESCRIPTION)
+            .bind(description)
+            .bind(item_id)
+            .execute(&self.pool)
+            .await
+            .with_context(|| format!("Update description for item: {item_id}"))?;
         Ok(())
     }
 }

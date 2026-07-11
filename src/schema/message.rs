@@ -14,8 +14,14 @@ pub struct CoverImageData {
     pub url: Option<String>,
 }
 
+pub struct AbstractData {
+    pub item_id: i32,
+    pub abstract_text: Option<String>,
+}
+
 pub enum Message {
     Save(SaveOutcome),
     Metadata(Vec<Box<dyn ItemMetadata>>),
     ImageCover(Box<CoverImageData>),
+    Abstract(AbstractData),
 }

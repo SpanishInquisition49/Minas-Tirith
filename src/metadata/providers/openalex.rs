@@ -13,6 +13,7 @@ use crate::metadata::{
 pub struct OpenAlexManager {}
 
 impl OpenAlexManager {
+    const BASE_URL: &str = "https://api.openalex.org/works";
     pub fn new() -> Self {
         Self {}
     }
@@ -25,10 +26,9 @@ impl MetadataFetcher for OpenAlexManager {
         client: Arc<Client>,
         title: String,
     ) -> color_eyre::Result<Vec<Box<dyn ItemMetadata>>> {
-        const BASE_URL: &str = "https://api.openalex.org/works";
         let query = vec![("search", title), ("per-page", "5".to_string())];
         let res = client
-            .get(BASE_URL)
+            .get(Self::BASE_URL)
             .query(&query)
             .send()
             .await
@@ -41,6 +41,26 @@ impl MetadataFetcher for OpenAlexManager {
             .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
             .collect();
         Ok(items)
+    }
+
+    async fn fetch_abstract(
+        &self,
+        client: Arc<Client>,
+        _title: String,
+        doi: Option<String>,
+        _isbn: Option<String>,
+    ) -> color_eyre::Result<Option<String>> {
+        let Some(doi) = doi else { return Ok(None) };
+        let url = format!("{}/doi:{doi}", Self::BASE_URL);
+        if let Ok(res) = client.get(&url).send().await
+            && res.status().is_success()
+            && let Ok(item) = res.json::<OpenAlexItem>().await
+            && let Some(r#abstract) = item.reconstruct_abstract()
+        {
+            return Ok(Some(r#abstract));
+        } else {
+            Ok(None)
+        }
     }
 }
 

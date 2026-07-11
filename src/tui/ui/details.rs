@@ -105,7 +105,10 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     )));
     card.extend(wrap_labeled_field(
         "Abstract: ",
-        item.fields.description.clone().unwrap_or_default().as_str(),
+        &format!(
+            "\n{}",
+            item.fields.description.clone().unwrap_or_default().as_str()
+        ),
         text_width,
         titles_style,
     ));

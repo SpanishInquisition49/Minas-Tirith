@@ -30,7 +30,7 @@ use crate::{
     schema::{
         form::MetadataForm,
         item::DatabaseItem,
-        message::{CoverImageData, Message, SaveOutcome},
+        message::{AbstractData, CoverImageData, Message, SaveOutcome},
     },
 };
 
@@ -75,6 +75,8 @@ pub struct App {
     cache: Arc<ImageCache>,
     covers: HashMap<i32, StatefulProtocol>,
     pending_covers: HashSet<i32>,
+    pending_abstract: HashSet<i32>,
+    failed_abstract: HashSet<i32>,
 
     task_channel_tx: Arc<UnboundedSender<Message>>,
     task_channel_rx: UnboundedReceiver<Message>,
@@ -133,6 +135,8 @@ impl App {
             task_channel_tx: Arc::new(task_channel_tx),
             task_channel_rx,
             selectd_tab: 0,
+            pending_abstract: HashSet::new(),
+            failed_abstract: HashSet::new(),
         };
         app.request_refresh_item_list().await?;
         app.request_cover_for_selected();
@@ -449,6 +453,41 @@ impl App {
         Ok(())
     }
 
+    pub fn handle_abstract_message(&mut self, data: &AbstractData) {
+        self.pending_covers.remove(&data.item_id);
+        let Some(item) = self.items.iter_mut().find(|i| i.id == data.item_id) else {
+            return;
+        };
+        match &data.abstract_text {
+            Some(text) => {
+                item.fields.description = Some(text.to_owned());
+            }
+            None => {
+                self.failed_abstract.insert(data.item_id);
+                if let Ok(notif) = Notification::new(format!(
+                    "Failed to find abstract for '{}'",
+                    item.fields.title
+                ))
+                .title(" Fetching Metadata ")
+                .timing(
+                    Timing::Fixed(Duration::from_millis(500)),
+                    Timing::Fixed(Duration::from_secs(3)),
+                    Timing::Fixed(Duration::from_millis(500)),
+                )
+                .max_size(SizeConstraint::Percentage(0.6), SizeConstraint::Absolute(4))
+                .anchor(Anchor::TopRight)
+                .animation(Animation::Slide)
+                .level(Level::Warn)
+                .slide_direction(SlideDirection::FromTop)
+                .auto_dismiss(AutoDismiss::After(Duration::from_secs(2)))
+                .build()
+                {
+                    let _ = self.notifications.add(notif);
+                }
+            }
+        }
+    }
+
     pub async fn poll_messages(&mut self) -> color_eyre::Result<()> {
         while let Ok(message) = self.task_channel_rx.try_recv() {
             match message {
@@ -457,6 +496,7 @@ impl App {
                     self.handle_metadata_search_message(item_metadatas)
                 }
                 Message::ImageCover(cover_data) => self.handle_cover_message(*cover_data),
+                Message::Abstract(abstract_data) => self.handle_abstract_message(&abstract_data),
             }
         }
         Ok(())
@@ -489,14 +529,30 @@ impl App {
 
     pub fn send_bibtex_to_system_clipboard(&mut self) {
         let Some(item) = self.selected_item() else {
-            // TODO: add notification for failure
+            if let Ok(notif) = Notification::new("No selected item")
+                .title(" Export citation ")
+                .timing(
+                    Timing::Fixed(Duration::from_millis(500)),
+                    Timing::Fixed(Duration::from_secs(3)),
+                    Timing::Fixed(Duration::from_millis(500)),
+                )
+                .max_size(SizeConstraint::Percentage(0.6), SizeConstraint::Absolute(4))
+                .anchor(Anchor::TopRight)
+                .animation(Animation::Slide)
+                .level(Level::Error)
+                .slide_direction(SlideDirection::FromTop)
+                .auto_dismiss(AutoDismiss::After(Duration::from_secs(2)))
+                .build()
+            {
+                let _ = self.notifications.add(notif);
+            }
             return;
         };
         let bibtex = item.to_bibtex();
         let mut ctx = ClipboardContext::new().unwrap();
         let _ = ctx.set_contents(bibtex.to_owned());
         if let Ok(notif) = Notification::new("Copied Bibtex")
-            .title("  Info ")
+            .title("  Export citation ")
             .timing(
                 Timing::Fixed(Duration::from_millis(500)),
                 Timing::Fixed(Duration::from_secs(3)),
@@ -512,5 +568,37 @@ impl App {
         {
             let _ = self.notifications.add(notif);
         }
+    }
+
+    pub fn request_abstract_for_selected(&mut self) {
+        let Some(item) = self.selected_item() else {
+            return;
+        };
+        if item.fields.description.is_some()
+            || self.failed_abstract.contains(&item.id)
+            || self.pending_abstract.contains(&item.id)
+        {
+            return;
+        }
+
+        let id = item.id;
+        let title = item.fields.title.clone();
+        let doi = item.fields.doi.clone();
+        let isbn = item.fields.isbn.clone();
+
+        let provider = self.metadata_provider.clone();
+        let archive = self.archive.clone();
+        let tx = self.task_channel_tx.clone();
+        self.pending_abstract.insert(id);
+        tokio::spawn(async move {
+            let abstract_text = provider.fetch_abstract(&title, doi, isbn).await;
+            if let Some(text) = &abstract_text {
+                archive.set_item_description(id, text).await.is_ok();
+                let _ = tx.send(Message::Abstract(AbstractData {
+                    item_id: id,
+                    abstract_text,
+                }));
+            }
+        });
     }
 }
