@@ -30,7 +30,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
 
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(24), Constraint::Min(0)])
+        .constraints([Constraint::Length(34), Constraint::Min(0)])
         .spacing(2)
         .split(inner);
 
@@ -98,6 +98,17 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         }
         card.push(Line::from(tags));
     }
+
+    card.push(Line::from(Span::styled(
+        symbols::DOT.repeat(text_width as usize),
+        Style::default().dark_gray(),
+    )));
+    card.extend(wrap_labeled_field(
+        "Abstract: ",
+        item.fields.description.clone().unwrap_or_default().as_str(),
+        text_width,
+        titles_style,
+    ));
 
     f.render_widget(Paragraph::new(card), cols[1]);
     draw_cover_slot(f, app, cols[0], has_cover_url);
@@ -178,11 +189,6 @@ fn wrap_labeled_field(
 }
 
 fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool) {
-    let cover_area = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(22), Constraint::Min(0)])
-        .split(area)[0];
-
     let placeholder_block = Block::default()
         .borders(Borders::ALL)
         .padding(Padding::uniform(1))
@@ -192,20 +198,20 @@ fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool
         let placeholder = Paragraph::new(" \nNo cover")
             .alignment(ratatui::layout::Alignment::Center)
             .block(placeholder_block);
-        f.render_widget(placeholder, cover_area);
+        f.render_widget(placeholder, area);
         return;
     }
 
     match app.selected_cover() {
         Some(protocol) => {
             // Resize::Fit(None) è già il default: preserva aspect ratio
-            f.render_stateful_widget(StatefulImage::default(), cover_area, protocol);
+            f.render_stateful_widget(StatefulImage::default(), area, protocol);
         }
         None => {
             let placeholder = Paragraph::new("Loading…")
                 .alignment(ratatui::layout::Alignment::Center)
                 .block(placeholder_block);
-            f.render_widget(placeholder, cover_area);
+            f.render_widget(placeholder, area);
         }
     }
 }
