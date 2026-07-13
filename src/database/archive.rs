@@ -6,6 +6,7 @@ use sqlx::Row;
 use sqlx::migrate::Migrator;
 use sqlx::{SqlitePool, sqlite::SqliteRow};
 
+use crate::schema::collection::Collection;
 use crate::{metadata::common_metadata::ItemMetadata, schema::item::DatabaseItem};
 
 static MIGRATOR: Migrator = sqlx::migrate!();
@@ -24,25 +25,88 @@ impl Archive {
         MIGRATOR.run(&self.pool).await.context("Running Migrations")
     }
 
+    // NOTE: Items Queries
     const GET_ALL_ITEMS: &str = "SELECT * FROM items";
-    const GET_AUTHORS_FOR_ITEM: &str = "SELECT a.* FROM authors AS a INNER JOIN item_authors AS ia ON a.id = ia.author_id WHERE item_id = ? ORDER BY ia.author_order";
-    const GET_TAGS_FOR_ITEM: &str = "SELECT t.* FROM tags AS t INNER JOIN item_tags AS it ON t.id = it.tag_id WHERE item_id = ? ORDER BY t.slug";
     const ADD_ITEM: &str = "
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url, path, container)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (slug) DO UPDATE SET slug = excluded.slug, container = COALESCE(excluded.container, container) RETURNING id
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+ON CONFLICT (slug)
+DO UPDATE SET 
+    slug = excluded.slug,
+    container = COALESCE(excluded.container, container)
+RETURNING id
 ";
     const SET_ITEM_DESCRIPTION: &str = "UPDATE items SET description = ? WHERE id = ?";
-    const ADD_AUTHOR: &str = "INSERT INTO authors (name, slug, given_name, family_name) VALUES (?,?,?,?) ON CONFLICT DO UPDATE SET slug = excluded.slug, given_name = excluded.given_name, family_name = excluded.given_name RETURNING id";
-    const ADD_ITEM_AUTHOR: &str = "INSERT INTO item_authors (item_id, author_id, author_order) VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
     const SET_COVER_IMAGE_URL: &str = "UPDATE items SET cover_image_url = ? WHERE id = ?;";
+    const UPDATE_ITEM_METADATA: &str = "
+UPDATE items
+SET 
+    title = ?,
+    description = ?,
+    type = ?,
+    doi = ?,
+    isbn = ?,
+    publication_date = ?,
+    slug = ?,
+    cover_image_url = ?,
+    container = ?
+WHERE id = ?
+";
+    // NOTE: Authors Queries
+    const GET_AUTHORS_FOR_ITEM: &str = "
+SELECT a.*
+FROM authors AS a
+INNER JOIN item_authors AS ia ON a.id = ia.author_id
+WHERE item_id = ?
+ORDER BY ia.author_order";
+    const ADD_AUTHOR: &str = "
+INSERT INTO authors (name, slug, given_name, family_name)
+VALUES (?,?,?,?)
+ON CONFLICT DO UPDATE SET
+    slug = excluded.slug,
+    given_name = excluded.given_name,
+    family_name = excluded.given_name
+RETURNING id";
+    const ADD_ITEM_AUTHOR: &str = "
+INSERT INTO item_authors (item_id, author_id, author_order) 
+VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
+
+    // NOTE: Tags Queries
+    const GET_TAGS_FOR_ITEM: &str = "
+SELECT t.*
+FROM tags AS t
+INNER JOIN item_tags AS it ON t.id = it.tag_id
+WHERE item_id = ?
+ORDER BY t.slug";
     const ADD_TAG: &str = "INSERT INTO tags (name, slug) VALUES (?,?) ON CONFLICT DO UPDATE SET slug = excluded.slug RETURNING id";
     const ADD_ITEM_TAG: &str =
         "INSERT INTO item_tags (item_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
     const CLEAR_ITEM_TAGS: &str = "DELETE FROM item_tags WHERE item_id = ?";
-    const UPDATE_ITEM_METADATA: &str = "
-UPDATE items
-SET title = ?, description = ?, type = ?, doi = ?, isbn = ?, publication_date = ?, slug = ?, cover_image_url = ?, container = ?
-WHERE id = ?
+
+    // NOTE: Collections Queries
+    const GET_ALL_COLLECTIONS: &str = "SELECT * FROM collections ORDER BY name";
+    const GET_COLLECTIONS_FOR_ITEM: &str = "
+SELECT c.*
+FROM collections AS c
+INNER JOIN item_collections AS ic ON c.id = ic.collection_id
+WHERE ic.item_id = ?
+ORDER BY c.name";
+    const CREATE_COLLECTION: &str = "
+INSERT INTO collections (name, slug)
+VALUES (?, ?)
+ON CONFLICT (name)
+DO UPDATE SET
+    slug = excluded.slug,
+    name = excluded.name
+RETURNING *
+";
+    const DELETE_COLLECTION: &str = "DELETE FROM collections WHERE id = ?";
+    const ADD_ITEM_TO_COLLECTION: &str = "
+INSERT INTO item_collections (item_id, collection_id)
+VALUES (?,?) ON CONFLICT DO NOTHING
+";
+    const REMOVE_ITEM_FROM_COLLECTION: &str = "
+DELETE FROM item_collections WHERE item_id = ? AND collection_id = ?
 ";
 
     pub async fn get_all_items(&self) -> color_eyre::Result<Vec<DatabaseItem>> {
@@ -65,8 +129,15 @@ WHERE id = ?
                 .fetch_all(&self.pool)
                 .await
                 .context("Fetching tags for item")?;
+
+            let collections: Vec<Collection> = sqlx::query_as(Archive::GET_COLLECTIONS_FOR_ITEM)
+                .bind(item.id)
+                .fetch_all(&self.pool)
+                .await
+                .context("Fetching collections for item")?;
             item.authors = authors;
-            item.tags = tags
+            item.tags = tags;
+            item.collections = collections;
         }
         Ok(items)
     }
@@ -214,6 +285,59 @@ WHERE id = ?
             .execute(&self.pool)
             .await
             .with_context(|| format!("Update description for item: {item_id}"))?;
+        Ok(())
+    }
+
+    pub async fn get_all_collections(&self) -> color_eyre::Result<Vec<Collection>> {
+        sqlx::query_as(Archive::GET_ALL_COLLECTIONS)
+            .fetch_all(&self.pool)
+            .await
+            .context("Fetching collections")
+    }
+
+    pub async fn create_collection(&self, name: &str) -> color_eyre::Result<Collection> {
+        sqlx::query_as(Archive::CREATE_COLLECTION)
+            .bind(name)
+            .bind(slugify(name))
+            .fetch_one(&self.pool)
+            .await
+            .context("Creating collection")
+    }
+
+    pub async fn delete_collecton(&self, collection_id: i32) -> color_eyre::Result<()> {
+        sqlx::query(Archive::DELETE_COLLECTION)
+            .bind(collection_id)
+            .execute(&self.pool)
+            .await
+            .context("Deleting collection")?;
+        Ok(())
+    }
+
+    pub async fn add_item_to_collection(
+        &self,
+        item_id: i32,
+        collection_id: i32,
+    ) -> color_eyre::Result<()> {
+        sqlx::query(Archive::ADD_ITEM_TO_COLLECTION)
+            .bind(item_id)
+            .bind(collection_id)
+            .execute(&self.pool)
+            .await
+            .context("Adding item to collection")?;
+        Ok(())
+    }
+
+    pub async fn remove_item_from_collection(
+        &self,
+        item_id: i32,
+        collection_id: i32,
+    ) -> color_eyre::Result<()> {
+        sqlx::query(Archive::REMOVE_ITEM_FROM_COLLECTION)
+            .bind(item_id)
+            .bind(collection_id)
+            .execute(&self.pool)
+            .await
+            .context("Adding item to collection")?;
         Ok(())
     }
 }

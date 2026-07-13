@@ -14,7 +14,13 @@ use ratatui_explorer::Theme;
 
 use crate::tui::{
     app::{App, Mode, TABS_LABELS},
-    ui::{details::draw_details, form::draw_metadata_edit_popup},
+    ui::{
+        collection::{
+            draw_collection_assign_popup, draw_collection_create_popup, draw_collection_sidebar,
+        },
+        details::draw_details,
+        form::draw_metadata_edit_popup,
+    },
 };
 
 pub fn draw(f: &mut Frame, app: &mut App) {
@@ -27,6 +33,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .direction(Horizontal)
         .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
         .split(outer[0]);
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
+        .split(main[0]);
 
     let title = if app.is_searching {
         let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -50,7 +61,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 
     app.file_explorer.set_theme(theme);
 
-    draw_list(f, app, main[0]);
+    draw_collection_sidebar(f, app, rows[0]);
+    draw_list(f, app, rows[1]);
     draw_details(f, app, main[1]);
     draw_status(f, outer[1]);
     match app.mode {
@@ -59,6 +71,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::Search => todo!(),
         Mode::MetadataSelect => draw_metadata_select_popup(f, app),
         Mode::MetadataEdit => draw_metadata_edit_popup(f, app),
+        Mode::CollectionCreate => draw_collection_create_popup(f, app),
+        Mode::CollectionAssign => draw_collection_assign_popup(f, app),
     }
     app.notifications.render(f, f.area());
 }
@@ -114,8 +128,6 @@ fn draw_add_popup(f: &mut Frame, app: &mut App) {
 
 fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let index = app.items_list_state.selected().unwrap_or_default() + 1;
-    let total = app.items.len();
-    let bottom_line = Line::from(format!(" {index} of {total} ").yellow());
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Max(1), Constraint::Fill(1)])
@@ -132,6 +144,8 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         .filter(|i| app.keep_items(i))
         .map(|i| ListItem::new(i.fields.title.clone()))
         .collect();
+    let total = items.len();
+    let bottom_line = Line::from(format!(" {index} of {total} ").yellow());
 
     let list = List::new(items)
         .block(
@@ -164,6 +178,8 @@ fn draw_status(f: &mut Frame, area: Rect) {
         "<E>".green().bold(),
         " Export Bibtex: ".yellow(),
         "<B>".green().bold(),
+        " Focus: ".yellow(),
+        "<Tab>".green().bold(),
         " Quit: ".yellow(),
         "<Q> ".green().bold(),
     ]);

@@ -5,9 +5,10 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::StreamExt;
 use ratatui::{Terminal, backend::Backend};
 use tokio::time::interval;
+use tui_input::backend::crossterm::EventHandler;
 
 use crate::tui::{
-    app::{App, Mode},
+    app::{App, Focus, Mode},
     ui::base::draw,
 };
 
@@ -32,6 +33,9 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
                     if let Mode::MetadataEdit = app.mode && let Some(form) = &mut app.metadata_form && form.editing {
                         form.handle_event(&event);
                     }
+                    if let Mode::CollectionCreate = app.mode {
+                        app.collection_name_input.handle_event(&event);
+                    }
                     if let Event::Key(key) = event {
                         handle_key(app, key).await?;
                     }
@@ -54,21 +58,38 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
 
 async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
     match app.mode {
-        Mode::Normal => match key.code {
-            KeyCode::Char('[') => app.tabs_prev(),
-            KeyCode::Char(']') => app.tabs_next(),
-            KeyCode::Char('q') => app.quit = true,
-            KeyCode::Char('j') | KeyCode::Down => app.select_next(),
-            KeyCode::Char('k') | KeyCode::Up => app.select_prev(),
-            KeyCode::Enter => app.request_file_opening()?,
-            KeyCode::Char('a') => app.mode = Mode::Insert,
-            KeyCode::Char('e') => {
-                app.open_metadata_edit_for_selected_item();
+        Mode::Normal => {
+            if let KeyCode::Tab = key.code {
+                app.toggle_focus();
+                return Ok(());
             }
-            KeyCode::Char('b') => app.send_bibtex_to_system_clipboard(),
-            KeyCode::Char('/') => app.mode = Mode::Search,
-            _ => {}
-        },
+            match app.focus {
+                Focus::Items => match key.code {
+                    KeyCode::Char('[') => app.tabs_prev(),
+                    KeyCode::Char(']') => app.tabs_next(),
+                    KeyCode::Char('q') => app.quit = true,
+                    KeyCode::Char('j') | KeyCode::Down => app.select_next(),
+                    KeyCode::Char('k') | KeyCode::Up => app.select_prev(),
+                    KeyCode::Enter => app.request_file_opening()?,
+                    KeyCode::Char('a') => app.mode = Mode::Insert,
+                    KeyCode::Char('e') => {
+                        app.open_metadata_edit_for_selected_item();
+                    }
+                    KeyCode::Char('b') => app.send_bibtex_to_system_clipboard(),
+                    KeyCode::Char('c') => app.open_collection_assign_for_selected(),
+                    KeyCode::Char('/') => app.mode = Mode::Search,
+                    _ => {}
+                },
+                Focus::Collections => match key.code {
+                    KeyCode::Char('j') | KeyCode::Down => app.select_collection_next(),
+                    KeyCode::Char('k') | KeyCode::Up => app.select_collection_prev(),
+                    KeyCode::Char('n') => app.open_collection_create(),
+                    KeyCode::Enter => app.confirm_collection_selection(),
+                    KeyCode::Char('q') => app.quit = true,
+                    _ => {}
+                },
+            }
+        }
         Mode::Insert => match (key.modifiers, key.code) {
             (KeyModifiers::NONE, KeyCode::Esc)
             | (KeyModifiers::NONE, KeyCode::Backspace)
@@ -134,6 +155,19 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                 }
             }
         }
+        Mode::CollectionCreate => match key.code {
+            KeyCode::Enter => app.confirm_collection_create().await?,
+            KeyCode::Esc => app.close_collection_create(),
+            _ => {}
+        },
+        Mode::CollectionAssign => match (key.modifiers, key.code) {
+            (_, KeyCode::Char('j')) | (_, KeyCode::Down) => app.collection_assign_next(),
+            (_, KeyCode::Char('k')) | (_, KeyCode::Up) => app.collection_assign_prev(),
+            (_, KeyCode::Char(' ')) | (_, KeyCode::Enter) => app.collection_assign_toggle_current(),
+            (KeyModifiers::CONTROL, KeyCode::Char('s')) => app.confirm_collection_assign().await?,
+            (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => app.cancel_collection_assign(),
+            _ => {}
+        },
     }
     Ok(())
 }

@@ -88,15 +88,24 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
             isbn.into(),
         ]));
     }
+    if !item.collections.is_empty() {
+        let collections: Vec<(usize, Span<'static>)> = item
+            .collections
+            .iter()
+            .map(|c| (c.span_len(), c.to_span()))
+            .collect();
+        card.push(Line::from("Collections: ".bold().style(titles_style)));
+        card.extend(wrap_pills(collections, text_width));
+    }
 
     if !item.tags.is_empty() {
-        let mut tags: Vec<Span> = Vec::new();
+        let tags: Vec<(usize, Span<'static>)> = item
+            .tags
+            .iter()
+            .map(|t| (t.span_len(), t.to_span()))
+            .collect();
         card.push(Line::from("Tags: ".bold().style(titles_style)));
-        for tag in &item.tags {
-            tags.push(tag.to_span());
-            tags.push(Span::raw(" "));
-        }
-        card.push(Line::from(tags));
+        card.extend(wrap_pills(tags, text_width));
     }
 
     card.push(Line::from(Span::styled(

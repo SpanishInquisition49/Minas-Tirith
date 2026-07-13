@@ -18,6 +18,7 @@ use ratatui_notifications::{
     SlideDirection, Timing,
 };
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tui_input::Input;
 
 use crate::{
     database::archive::Archive,
@@ -28,11 +29,24 @@ use crate::{
         image_cache::ImageCache,
     },
     schema::{
+        collection::Collection,
         form::MetadataForm,
         item::DatabaseItem,
         message::{AbstractData, CoverImageData, Message, SaveOutcome},
     },
 };
+
+pub enum Focus {
+    Items,
+    Collections,
+}
+
+pub struct CollectionAssignState {
+    pub item_id: i32,
+    pub original: HashSet<i32>,
+    pub selected: HashSet<i32>,
+    pub list_state: ListState,
+}
 
 pub enum Mode {
     Normal,
@@ -40,6 +54,8 @@ pub enum Mode {
     Search,
     MetadataSelect,
     MetadataEdit,
+    CollectionCreate,
+    CollectionAssign,
 }
 
 pub enum EditContext {
@@ -68,6 +84,14 @@ pub struct App {
     pub last_error: Option<String>,
     pub tick_counter: usize,
     pub is_searching: bool,
+
+    // Collections
+    pub collections: Vec<Collection>,
+    pub collections_list_state: ListState,
+    pub selected_collection: Option<i32>,
+    pub focus: Focus,
+    pub collection_name_input: Input,
+    pub collection_assign: Option<CollectionAssignState>,
 
     metadata_provider: Arc<MetadataProvider>,
     candidate_path: Option<PathBuf>,
@@ -137,8 +161,15 @@ impl App {
             selectd_tab: 0,
             pending_abstract: HashSet::new(),
             failed_abstract: HashSet::new(),
+            collections: Vec::new(),
+            collections_list_state: ListState::default(),
+            selected_collection: None,
+            focus: Focus::Items,
+            collection_name_input: Input::default(),
+            collection_assign: None,
         };
         app.request_refresh_item_list().await?;
+        app.request_refresh_collections().await?;
         app.request_cover_for_selected();
         Ok(app)
     }
@@ -178,33 +209,49 @@ impl App {
     }
 
     pub fn keep_items(&self, item: &DatabaseItem) -> bool {
+        let keep = match self.selected_collection {
+            Some(_) if item.collections.is_empty() => false,
+            Some(collection_id) => item.collections.iter().any(|c| c.id == collection_id),
+            None => true,
+        };
         if self.selectd_tab == 0 {
-            return true;
+            return keep;
         }
         let Ok(active_item_type) = ItemType::try_from(TABS_LABELS[self.selectd_tab]) else {
-            return true;
+            return keep;
         };
         let item_type =
             ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::default());
-        active_item_type == item_type
+        keep && active_item_type == item_type
     }
 
     pub fn selected_item(&self) -> Option<&DatabaseItem> {
-        let binding = self.items.iter();
-        let filtered_items = binding
-            .as_ref()
-            .iter()
-            .filter(|i| self.keep_items(i))
-            .collect::<Vec<_>>();
-
-        self.items_list_state.selected().and_then(|i| {
-            let selected = filtered_items.get(i)?;
-            self.items
+        let slug = {
+            let filtered_items = self
+                .items
                 .iter()
-                .find(|i| i.fields.slug == selected.fields.slug)
-        })
+                .filter(|i| self.keep_items(i))
+                .collect::<Vec<_>>();
+            let index = self.items_list_state.selected()?;
+            filtered_items.get(index)?.fields.slug.clone()
+        };
+
+        self.items.iter().find(|i| i.fields.slug == slug)
     }
 
+    pub fn selected_item_mut(&mut self) -> Option<&mut DatabaseItem> {
+        let slug = {
+            let filtered_items = self
+                .items
+                .iter()
+                .filter(|i| self.keep_items(i))
+                .collect::<Vec<_>>();
+            let index = self.items_list_state.selected()?;
+            filtered_items.get(index)?.fields.slug.clone()
+        };
+
+        self.items.iter_mut().find(|i| i.fields.slug == slug)
+    }
     pub fn request_cover_for_selected(&mut self) {
         let Some(item) = self.selected_item() else {
             return;
@@ -426,11 +473,16 @@ impl App {
         self.last_error = None;
         let archive = self.archive.clone();
         let tx = self.task_channel_tx.clone();
+        let snapshot = form.snapshot();
 
         tokio::spawn(async move {
             let result = match ctx {
-                EditContext::NewItem { path } => archive.save_item_from_form(&form, &path).await,
-                EditContext::ExistingItem { id } => archive.update_item_from_form(id, &form).await,
+                EditContext::NewItem { path } => {
+                    archive.save_item_from_form(&snapshot, &path).await
+                }
+                EditContext::ExistingItem { id } => {
+                    archive.update_item_from_form(id, &snapshot).await
+                }
             };
             let outcome = match result {
                 Ok(()) => SaveOutcome::Saved,
@@ -593,12 +645,176 @@ impl App {
         tokio::spawn(async move {
             let abstract_text = provider.fetch_abstract(&title, doi, isbn).await;
             if let Some(text) = &abstract_text {
-                archive.set_item_description(id, text).await.is_ok();
+                let _ = archive.set_item_description(id, text).await.is_ok();
                 let _ = tx.send(Message::Abstract(AbstractData {
                     item_id: id,
                     abstract_text,
                 }));
             }
         });
+    }
+
+    pub fn toggle_focus(&mut self) {
+        self.focus = match self.focus {
+            Focus::Items => Focus::Collections,
+            Focus::Collections => Focus::Items,
+        }
+    }
+
+    pub async fn request_refresh_collections(&mut self) -> color_eyre::Result<()> {
+        self.collections = self.archive.get_all_collections().await?;
+        Ok(())
+    }
+
+    pub fn select_collection_prev(&mut self) {
+        let len = self.collections.len() + 1;
+        let i = match self.collections_list_state.selected() {
+            Some(i) if i > 0 => i - 1,
+            Some(_) => len - 1,
+            None => 0,
+        };
+        self.collections_list_state.select(Some(i));
+    }
+
+    pub fn select_collection_next(&mut self) {
+        let len = self.collections.len() + 1;
+        let i = match self.collections_list_state.selected() {
+            Some(i) if i + 1 < len => i + 1,
+            Some(_) => 0,
+            None => 0,
+        };
+        self.collections_list_state.select(Some(i));
+    }
+
+    pub fn confirm_collection_selection(&mut self) {
+        let Some(i) = self.collections_list_state.selected() else {
+            return;
+        };
+        self.selected_collection = if i == 0 {
+            None
+        } else {
+            self.collections.get(i - 1).map(|c| c.id)
+        };
+        self.items_list_state = ListState::default();
+        if !self.items.is_empty() {
+            self.items_list_state.select(Some(0));
+        }
+    }
+
+    pub fn open_collection_create(&mut self) {
+        self.collection_name_input = Input::default();
+        self.mode = Mode::CollectionCreate;
+    }
+
+    pub fn close_collection_create(&mut self) {
+        self.mode = Mode::Normal;
+    }
+
+    pub async fn confirm_collection_create(&mut self) -> color_eyre::Result<()> {
+        let name = self.collection_name_input.to_string();
+        if !name.trim().is_empty() {
+            self.archive.create_collection(name.trim()).await?;
+            self.request_refresh_collections().await?;
+        }
+        self.mode = Mode::Normal;
+        Ok(())
+    }
+
+    pub fn open_collection_assign_for_selected(&mut self) {
+        let Some(item) = self.selected_item() else {
+            return;
+        };
+        let item_id = item.id;
+        let original: HashSet<i32> = item.collections.iter().map(|c| c.id).collect();
+        let selected = original.clone();
+
+        let mut list_state = ListState::default();
+        if !self.collections.is_empty() {
+            list_state.select(Some(0));
+        }
+
+        self.collection_assign = Some(CollectionAssignState {
+            item_id,
+            original,
+            selected,
+            list_state,
+        });
+        self.mode = Mode::CollectionAssign;
+    }
+
+    pub fn collection_assign_next(&mut self) {
+        let len = self.collections.len();
+        let Some(state) = &mut self.collection_assign else {
+            return;
+        };
+        if len == 0 {
+            return;
+        }
+        let i = match state.list_state.selected() {
+            Some(i) if i + 1 < len => i + 1,
+            _ => 0,
+        };
+        state.list_state.select(Some(i));
+    }
+
+    pub fn collection_assign_prev(&mut self) {
+        let len = self.collections.len();
+        let Some(state) = &mut self.collection_assign else {
+            return;
+        };
+        if len == 0 {
+            return;
+        }
+        let i = match state.list_state.selected() {
+            Some(i) if i > 0 => i - 1,
+            _ => len - 1,
+        };
+        state.list_state.select(Some(i));
+    }
+
+    pub fn collection_assign_toggle_current(&mut self) {
+        let Some(index) = self
+            .collection_assign
+            .as_ref()
+            .and_then(|s| s.list_state.selected())
+        else {
+            return;
+        };
+        let Some(collection_id) = self.collections.get(index).map(|c| c.id) else {
+            return;
+        };
+
+        if let Some(state) = &mut self.collection_assign
+            && !state.selected.remove(&collection_id)
+        {
+            state.selected.insert(collection_id);
+        }
+    }
+
+    pub fn cancel_collection_assign(&mut self) {
+        self.collection_assign = None;
+        self.mode = Mode::Normal;
+    }
+
+    pub async fn confirm_collection_assign(&mut self) -> color_eyre::Result<()> {
+        let Some(state) = self.collection_assign.take() else {
+            self.mode = Mode::Normal;
+            return Ok(());
+        };
+
+        for &collection_id in state.selected.difference(&state.original) {
+            self.archive
+                .add_item_to_collection(state.item_id, collection_id)
+                .await?;
+        }
+        for &collection_id in state.original.difference(&state.selected) {
+            self.archive
+                .remove_item_from_collection(state.item_id, collection_id)
+                .await?;
+        }
+
+        self.mode = Mode::Normal;
+        self.request_refresh_item_list().await?;
+        Ok(())
     }
 }

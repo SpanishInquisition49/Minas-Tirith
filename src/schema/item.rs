@@ -6,7 +6,7 @@ use sqlx::types::chrono::{DateTime, Utc};
 
 use crate::{
     metadata::common_metadata::{ItemMetadata, ItemType},
-    schema::{author::Author, tag::Tag},
+    schema::{author::Author, collection::Collection, tag::Tag},
 };
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -21,6 +21,8 @@ pub struct DatabaseItem {
     pub authors: Vec<Author>,
     #[sqlx(skip)]
     pub tags: Vec<Tag>,
+    #[sqlx(skip)]
+    pub collections: Vec<Collection>,
 }
 
 impl fmt::Display for DatabaseItem {

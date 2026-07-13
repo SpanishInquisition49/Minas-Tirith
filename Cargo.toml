@@ -19,6 +19,7 @@ ratatui = "0.30.2"
 ratatui-explorer = "0.3.0"
 ratatui-image = { version = "11.0.6", features = ["crossterm", "tokio", "image-defaults"] }
 ratatui-notifications = "0.1.0"
+ratatui-textarea = "0.9.2"
 reqwest = { version = "0.13.4", features = ["json", "query"] }
 rustix = "1.1.4"
 serde = { version = "1.0.228", features = ["derive"] }

@@ -1,5 +1,6 @@
 use crossterm::event::Event;
-use slug::slugify;
+use ratatui::style::{Modifier, Style};
+use ratatui_textarea::{TextArea, WrapMode};
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
@@ -16,10 +17,82 @@ pub const FIELD_LABELS: [&str; 6] = [
     "Tags",
 ];
 
+#[derive(Clone, Debug)]
+pub struct FormSnapshot {
+    pub title: String,
+    pub description: String,
+    pub item_type: ItemType,
+    pub doi: String,
+    pub isbn: String,
+    pub publication_date: String,
+    pub tags: Vec<String>,
+    pub authors: Vec<String>,
+    pub container: Option<String>,
+    pub cover_image_url: Option<String>,
+}
+
+impl ItemMetadata for FormSnapshot {
+    fn title(&self) -> String {
+        self.title.to_string()
+    }
+
+    fn description(&self) -> Option<String> {
+        Some(self.description.clone())
+    }
+
+    fn item_type(&self) -> ItemType {
+        self.item_type.clone()
+    }
+
+    fn authors(&self) -> Vec<String> {
+        self.authors.clone()
+    }
+
+    fn isbn(&self) -> Option<String> {
+        if self.isbn.is_empty() {
+            None
+        } else {
+            Some(self.isbn.to_string())
+        }
+    }
+
+    fn doi(&self) -> Option<String> {
+        if self.doi.is_empty() {
+            None
+        } else {
+            Some(self.doi.to_string())
+        }
+    }
+
+    fn publication_date(&self) -> Option<String> {
+        if self.publication_date.is_empty() {
+            None
+        } else {
+            Some(self.publication_date.to_string())
+        }
+    }
+
+    fn cover_image_url(&self) -> Option<String> {
+        self.cover_image_url.clone()
+    }
+
+    fn source(&self) -> String {
+        todo!()
+    }
+
+    fn tags(&self) -> Vec<String> {
+        self.tags.iter().map(|t| t.to_string()).collect()
+    }
+
+    fn container(&self) -> Option<String> {
+        self.container.clone()
+    }
+}
+
 #[derive(Debug)]
 pub struct MetadataForm {
     pub title: Input,
-    pub description: Input,
+    pub description: TextArea<'static>,
     pub doi: Input,
     pub isbn: Input,
     pub publication_date: Input,
@@ -32,61 +105,11 @@ pub struct MetadataForm {
     pub container: Option<String>,
 }
 
-impl ItemMetadata for MetadataForm {
-    fn title(&self) -> String {
-        self.title.to_string()
-    }
-
-    fn description(&self) -> Option<String> {
-        Self::opt(&self.description.to_string())
-    }
-
-    fn item_type(&self) -> ItemType {
-        self.item_type.clone()
-    }
-
-    fn authors(&self) -> Vec<String> {
-        self.authors.clone()
-    }
-
-    fn isbn(&self) -> Option<String> {
-        Self::opt(&self.isbn.to_string())
-    }
-
-    fn doi(&self) -> Option<String> {
-        Self::opt(&self.doi.to_string())
-    }
-
-    fn publication_date(&self) -> Option<String> {
-        Self::opt(&self.publication_date.to_string())
-    }
-
-    fn cover_image_url(&self) -> Option<String> {
-        self.cover_image_url.clone()
-    }
-
-    fn slug(&self) -> String {
-        slugify(self.title.to_string())
-    }
-
-    fn source(&self) -> String {
-        "internal".to_string()
-    }
-
-    fn tags(&self) -> Vec<String> {
-        self.tags_vec()
-    }
-
-    fn container(&self) -> Option<String> {
-        self.container.clone()
-    }
-}
-
 impl MetadataForm {
     pub fn new() -> Self {
         Self {
             title: Input::default(),
-            description: Input::default(),
+            description: TextArea::default(),
             doi: Input::default(),
             isbn: Input::default(),
             publication_date: Input::default(),
@@ -103,7 +126,14 @@ impl MetadataForm {
     pub fn from_candidate(candidate: &dyn ItemMetadata) -> Self {
         Self {
             title: candidate.title().into(),
-            description: candidate.description().unwrap_or_default().into(),
+            description: TextArea::new(
+                candidate
+                    .description()
+                    .unwrap_or_default()
+                    .split("\n")
+                    .map(|l| l.to_string())
+                    .collect::<Vec<_>>(),
+            ),
             doi: candidate.doi().unwrap_or_default().into(),
             isbn: candidate.isbn().unwrap_or_default().into(),
             publication_date: candidate.publication_date().unwrap_or_default().into(),
@@ -118,11 +148,22 @@ impl MetadataForm {
     }
 
     pub fn from_item(item: &DatabaseItem) -> Self {
+        let mut text_area = TextArea::new(
+            item.fields
+                .description
+                .clone()
+                .unwrap_or_default()
+                .split("\n")
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>(),
+        );
+        text_area.set_wrap_mode(WrapMode::Word);
+        text_area.set_cursor_style(Style::default().add_modifier(Modifier::BOLD));
         let item_type =
             ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::default());
         Self {
             title: item.fields.title.clone().into(),
-            description: item.fields.description.clone().unwrap_or_default().into(),
+            description: text_area,
             doi: item.fields.doi.clone().unwrap_or_default().into(),
             isbn: item.fields.isbn.clone().unwrap_or_default().into(),
             publication_date: item
@@ -147,10 +188,36 @@ impl MetadataForm {
         }
     }
 
+    pub fn snapshot(&self) -> FormSnapshot {
+        FormSnapshot {
+            title: self.title.value().to_string(),
+            description: self.description.lines().join("\n"),
+            item_type: self.item_type.clone(),
+            doi: self.doi.value().to_string(),
+            isbn: self.isbn.value().to_string(),
+            publication_date: self.publication_date.value().to_string(),
+            tags: self
+                .tags
+                .value()
+                .split(",")
+                .map(|t| t.to_string())
+                .collect(),
+            authors: self.authors.clone(),
+            container: self.container.clone(),
+            cover_image_url: self.cover_image_url.clone(),
+        }
+    }
+
     pub fn field_value(&self, index: usize) -> String {
         match index {
             0 => self.title.to_string(),
-            1 => self.description.to_string(),
+            1 => self
+                .description
+                .lines()
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
             2 => self.doi.to_string(),
             3 => self.isbn.to_string(),
             4 => self.publication_date.to_string(),
@@ -184,30 +251,17 @@ impl MetadataForm {
     pub fn handle_event(&mut self, event: &Event) {
         match self.field_index {
             0 => self.title.handle_event(event),
-            1 => self.description.handle_event(event),
+            1 => {
+                if let Event::Key(key) = event {
+                    self.description.input(*key);
+                }
+                None
+            }
             2 => self.doi.handle_event(event),
             3 => self.isbn.handle_event(event),
             4 => self.publication_date.handle_event(event),
             5 => self.tags.handle_event(event),
             _ => unreachable!(),
         };
-    }
-
-    fn tags_vec(&self) -> Vec<String> {
-        self.tags
-            .to_string()
-            .split(",")
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty())
-            .collect()
-    }
-
-    fn opt(s: &str) -> Option<String> {
-        let s = s.trim();
-        if s.is_empty() {
-            None
-        } else {
-            Some(s.to_string())
-        }
     }
 }
