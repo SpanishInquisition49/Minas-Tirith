@@ -24,15 +24,10 @@ use crate::tui::{
 };
 
 pub fn draw(f: &mut Frame, app: &mut App) {
-    let outer = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(1)])
-        .split(f.area());
-
     let main = Layout::default()
         .direction(Horizontal)
         .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
-        .split(outer[0]);
+        .split(f.area());
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
@@ -64,7 +59,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     draw_collection_sidebar(f, app, rows[0]);
     draw_list(f, app, rows[1]);
     draw_details(f, app, main[1]);
-    draw_status(f, outer[1]);
     match app.mode {
         Mode::Normal => {}                      // NO additional rendering
         Mode::Insert => draw_add_popup(f, app), // Add item popup
@@ -164,24 +158,4 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         &mut app.items_list_state,
     );
     f.render_widget(tabs, rows[0] + Offset::new(1, 0));
-}
-
-fn draw_status(f: &mut Frame, area: Rect) {
-    let instructions = Line::from(vec![
-        " Navigate: ".yellow(),
-        "<K/J>".green().bold(),
-        " Search: ".yellow(),
-        "</>".green().bold(),
-        " Add Tome: ".yellow(),
-        "<A>".green().bold(),
-        " Edit Tome: ".yellow(),
-        "<E>".green().bold(),
-        " Export Bibtex: ".yellow(),
-        "<B>".green().bold(),
-        " Focus: ".yellow(),
-        "<Tab>".green().bold(),
-        " Quit: ".yellow(),
-        "<Q> ".green().bold(),
-    ]);
-    f.render_widget(Paragraph::new(instructions), area);
 }

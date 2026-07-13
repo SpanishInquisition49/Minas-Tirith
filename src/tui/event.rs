@@ -84,6 +84,8 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                     KeyCode::Char('j') | KeyCode::Down => app.select_collection_next(),
                     KeyCode::Char('k') | KeyCode::Up => app.select_collection_prev(),
                     KeyCode::Char('n') => app.open_collection_create(),
+                    KeyCode::Char('c') => app.open_item_assign_for_selected_collection(),
+                    KeyCode::Char('d') => app.delete_collection().await?,
                     KeyCode::Enter => app.confirm_collection_selection(),
                     KeyCode::Char('q') => app.quit = true,
                     _ => {}

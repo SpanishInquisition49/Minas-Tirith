@@ -41,8 +41,16 @@ pub enum Focus {
     Collections,
 }
 
+pub enum AssignMode {
+    /// Assign items to the selected collection
+    Items,
+    /// Assign collections to the selected item
+    Collections,
+}
+
 pub struct CollectionAssignState {
-    pub item_id: i32,
+    pub mode: AssignMode,
+    pub id: i32,
     pub original: HashSet<i32>,
     pub selected: HashSet<i32>,
     pub list_state: ListState,
@@ -701,6 +709,23 @@ impl App {
         }
     }
 
+    pub async fn delete_collection(&mut self) -> color_eyre::Result<()> {
+        let Some(i) = self.collections_list_state.selected() else {
+            return Ok(());
+        };
+        if i == 0 {
+            return Ok(());
+        }
+        if let Some(collection_id) = self.collections.get(i - 1).map(|c| c.id) {
+            self.archive.delete_collecton(collection_id).await?;
+            self.items
+                .iter_mut()
+                .for_each(|i| i.collections.retain(|c| c.id != collection_id));
+        }
+        self.request_refresh_collections().await?;
+        Ok(())
+    }
+
     pub fn open_collection_create(&mut self) {
         self.collection_name_input = Input::default();
         self.mode = Mode::CollectionCreate;
@@ -720,6 +745,38 @@ impl App {
         Ok(())
     }
 
+    pub fn open_item_assign_for_selected_collection(&mut self) {
+        let Some(i) = self.collections_list_state.selected() else {
+            return;
+        };
+        if i == 0 {
+            return;
+        }
+        let Some(collection) = self.collections.get(i - 1) else {
+            return;
+        };
+        let collection_id = collection.id;
+        let original: HashSet<i32> = self
+            .items
+            .iter()
+            .filter(|i| i.collections.iter().any(|c| c.id == collection_id))
+            .map(|i| i.id)
+            .collect();
+        let selected = original.clone();
+        let mut list_state = ListState::default();
+        if !self.items.is_empty() {
+            list_state.select(Some(0));
+        }
+        self.collection_assign = Some(CollectionAssignState {
+            mode: AssignMode::Items,
+            id: collection_id,
+            original,
+            selected,
+            list_state,
+        });
+        self.mode = Mode::CollectionAssign;
+    }
+
     pub fn open_collection_assign_for_selected(&mut self) {
         let Some(item) = self.selected_item() else {
             return;
@@ -734,7 +791,8 @@ impl App {
         }
 
         self.collection_assign = Some(CollectionAssignState {
-            item_id,
+            mode: AssignMode::Collections,
+            id: item_id,
             original,
             selected,
             list_state,
@@ -743,9 +801,12 @@ impl App {
     }
 
     pub fn collection_assign_next(&mut self) {
-        let len = self.collections.len();
         let Some(state) = &mut self.collection_assign else {
             return;
+        };
+        let len = match state.mode {
+            AssignMode::Items => self.items.len(),
+            AssignMode::Collections => self.collections.len(),
         };
         if len == 0 {
             return;
@@ -758,9 +819,12 @@ impl App {
     }
 
     pub fn collection_assign_prev(&mut self) {
-        let len = self.collections.len();
         let Some(state) = &mut self.collection_assign else {
             return;
+        };
+        let len = match state.mode {
+            AssignMode::Items => self.items.len(),
+            AssignMode::Collections => self.collections.len(),
         };
         if len == 0 {
             return;
@@ -773,21 +837,29 @@ impl App {
     }
 
     pub fn collection_assign_toggle_current(&mut self) {
-        let Some(index) = self
-            .collection_assign
-            .as_ref()
-            .and_then(|s| s.list_state.selected())
-        else {
-            return;
-        };
-        let Some(collection_id) = self.collections.get(index).map(|c| c.id) else {
+        let Some(state) = &mut self.collection_assign else {
             return;
         };
 
-        if let Some(state) = &mut self.collection_assign
-            && !state.selected.remove(&collection_id)
-        {
-            state.selected.insert(collection_id);
+        let Some(index) = state.list_state.selected() else {
+            return;
+        };
+        let id = match state.mode {
+            AssignMode::Items => {
+                let Some(item_id) = self.items.get(index).map(|i| i.id) else {
+                    return;
+                };
+                item_id
+            }
+            AssignMode::Collections => {
+                let Some(collection_id) = self.collections.get(index).map(|c| c.id) else {
+                    return;
+                };
+                collection_id
+            }
+        };
+        if !state.selected.remove(&id) {
+            state.selected.insert(id);
         }
     }
 
@@ -802,15 +874,31 @@ impl App {
             return Ok(());
         };
 
-        for &collection_id in state.selected.difference(&state.original) {
-            self.archive
-                .add_item_to_collection(state.item_id, collection_id)
-                .await?;
-        }
-        for &collection_id in state.original.difference(&state.selected) {
-            self.archive
-                .remove_item_from_collection(state.item_id, collection_id)
-                .await?;
+        match state.mode {
+            AssignMode::Items => {
+                for &item_id in state.selected.difference(&state.original) {
+                    self.archive
+                        .add_item_to_collection(item_id, state.id)
+                        .await?;
+                }
+                for &item_id in state.original.difference(&state.selected) {
+                    self.archive
+                        .remove_item_from_collection(item_id, state.id)
+                        .await?;
+                }
+            }
+            AssignMode::Collections => {
+                for &collection_id in state.selected.difference(&state.original) {
+                    self.archive
+                        .add_item_to_collection(state.id, collection_id)
+                        .await?;
+                }
+                for &collection_id in state.original.difference(&state.selected) {
+                    self.archive
+                        .remove_item_from_collection(state.id, collection_id)
+                        .await?;
+                }
+            }
         }
 
         self.mode = Mode::Normal;

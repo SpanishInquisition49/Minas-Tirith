@@ -12,11 +12,28 @@ use crate::{metadata::common_metadata::ItemType, schema::graphics::Spannable, tu
 
 pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let title = Line::from(" Details ".yellow().bold().italic());
+    let instructions = Line::from(vec![
+        " Navigate: ".yellow(),
+        "<j/k>".green().bold(),
+        " Search: ".yellow(),
+        "</>".green().bold(),
+        " Add Tome: ".yellow(),
+        "<a>".green().bold(),
+        " Edit Tome: ".yellow(),
+        "<e>".green().bold(),
+        " Export Bibtex: ".yellow(),
+        "<b>".green().bold(),
+        " Focus: ".yellow(),
+        "<Tab>".green().bold(),
+        " Quit: ".yellow(),
+        "<q> ".green().bold(),
+    ]);
     let mut block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::THICK)
         .border_style(Style::default().blue())
         .padding(Padding::uniform(1))
+        .title_bottom(instructions.right_aligned())
         .title(title);
     let inner = block.inner(area);
 

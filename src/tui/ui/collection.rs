@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph},
 };
 
-use crate::tui::app::{App, Focus};
+use crate::tui::app::{App, AssignMode, Focus};
 
 pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Collections);
@@ -32,7 +32,15 @@ pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
                 .border_style(border_style)
                 .padding(Padding::uniform(1))
                 .title(Line::from(" Collections ".bold().italic().yellow()))
-                .title_bottom(Line::from(vec![" New: ".yellow(), "<N> ".green()]).right_aligned()),
+                .title_bottom(
+                    Line::from(vec![
+                        " New: ".yellow(),
+                        "<n> ".green(),
+                        "Delete: ".yellow(),
+                        "<d> ".green(),
+                    ])
+                    .right_aligned(),
+                ),
         )
         .highlight_style(Style::default().green());
 
@@ -70,18 +78,61 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
         return;
     };
 
-    let items: Vec<ListItem> = app
-        .collections
-        .iter()
-        .map(|c| {
-            let mark = if state.selected.contains(&c.id) {
-                "[x]"
-            } else {
-                "[ ]"
-            };
-            ListItem::new(format!("{mark} {}", c.name))
-        })
-        .collect();
+    let (items, title) = match state.mode {
+        AssignMode::Items => {
+            let items = app
+                .items
+                .iter()
+                .map(|i| {
+                    let mark = if state.selected.contains(&i.id) {
+                        "[x]"
+                    } else {
+                        "[ ]"
+                    };
+                    ListItem::new(format!("{mark} {}", i.fields.title))
+                })
+                .collect::<Vec<_>>();
+            let collection_name = app.collections.iter().find_map(|c| {
+                if c.id == state.id {
+                    Some(c.name.as_str())
+                } else {
+                    None
+                }
+            });
+            (
+                items,
+                format!(" Edit items for '{}' ", collection_name.unwrap_or_default()),
+            )
+        }
+        AssignMode::Collections => {
+            let items = app
+                .collections
+                .iter()
+                .map(|c| {
+                    let mark = if state.selected.contains(&c.id) {
+                        "[x]"
+                    } else {
+                        "[ ]"
+                    };
+                    ListItem::new(format!("{mark} {}", c.name))
+                })
+                .collect::<Vec<_>>();
+            let item_title = app.items.iter().find_map(|i| {
+                if i.id == state.id {
+                    Some(i.fields.title.as_str())
+                } else {
+                    None
+                }
+            });
+            (
+                items,
+                format!(
+                    " Edit collections for '{}' ",
+                    item_title.unwrap_or_default()
+                ),
+            )
+        }
+    };
 
     let list = List::new(items)
         .block(
@@ -90,7 +141,7 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
                 .border_set(border::THICK)
                 .border_style(Style::default().blue())
                 .padding(Padding::uniform(1))
-                .title(Line::from(" Assign collections ".bold().italic().yellow()))
+                .title(Line::from(title.bold().italic().yellow()))
                 .title_bottom(
                     Line::from(vec![
                         " Toggle: ".yellow(),
