@@ -17,7 +17,7 @@ pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
         Style::default().blue()
     };
 
-    let mut items: Vec<ListItem> = app
+    let items: Vec<ListItem> = app
         .collections
         .items
         .iter()
@@ -38,6 +38,8 @@ pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
                         "<n> ".green(),
                         "Delete: ".yellow(),
                         "<d> ".green(),
+                        "Export Bibtex: ".yellow(),
+                        "<b> ".green(),
                     ])
                     .right_aligned(),
                 ),

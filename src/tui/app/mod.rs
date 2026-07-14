@@ -11,7 +11,7 @@ use ratatui_notifications::{
     Anchor, Animation, AutoDismiss, Level, Notification, Notifications, SizeConstraint,
     SlideDirection, Timing,
 };
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{self, UnboundedReceiver};
 
 use crate::{
     database::archive::Archive,
@@ -232,6 +232,47 @@ impl App {
         };
         opener::open(PathBuf::from(&item.path))?;
         Ok(())
+    }
+
+    pub fn bulk_bibtex_to_system_clipboard(&mut self) {
+        let Some(collection) = self.collections.selected() else {
+            self.notify(
+                "No selected collection",
+                " Bulk Export citation ".to_string(),
+                Level::Error,
+            );
+            return;
+        };
+        let filtered_items: Vec<&DatabaseItem> = if Collection::is_trivial_collection(collection.id)
+        {
+            self.items.iter().collect()
+        } else {
+            self.items
+                .iter()
+                .filter(|i| i.collections.iter().any(|c| c.id == collection.id))
+                .collect::<Vec<_>>()
+        };
+
+        let mut bibtex = String::default();
+        for item in filtered_items {
+            bibtex.push_str(&format!("{}\n", item.to_bibtex()));
+        }
+
+        match ClipboardContext::new() {
+            Ok(mut ctx) => {
+                let _ = ctx.set_contents(bibtex);
+                self.notify(
+                    "Copied Bibtex",
+                    "  Export collection ".to_string(),
+                    Level::Info,
+                );
+            }
+            Err(_) => self.notify(
+                "Clipboard unavailable",
+                " Export citation ".to_string(),
+                Level::Error,
+            ),
+        }
     }
 
     pub fn send_bibtex_to_system_clipboard(&mut self) {
