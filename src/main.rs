@@ -34,9 +34,13 @@ fn get_image_cache_path(proj_dirs: &ProjectDirs) -> PathBuf {
 pub async fn init_db(proj_dirs: &ProjectDirs) -> color_eyre::Result<SqlitePool> {
     let db_path = get_db_path(proj_dirs);
 
-    let options = SqliteConnectOptions::from_str(db_path.to_str().unwrap())?
-        .create_if_missing(true)
-        .foreign_keys(true);
+    let options = SqliteConnectOptions::from_str(
+        db_path
+            .to_str()
+            .expect("Database path should be UTF-8 encoded"),
+    )?
+    .create_if_missing(true)
+    .foreign_keys(true);
 
     let pool = SqlitePoolOptions::new()
         .max_connections(5)

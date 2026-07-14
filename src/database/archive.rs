@@ -62,7 +62,7 @@ ORDER BY ia.author_order";
     const ADD_AUTHOR: &str = "
 INSERT INTO authors (name, slug, given_name, family_name)
 VALUES (?,?,?,?)
-ON CONFLICT DO UPDATE SET
+ON CONFLICT (slug) DO UPDATE SET
     slug = excluded.slug,
     given_name = excluded.given_name,
     family_name = excluded.given_name
@@ -78,7 +78,7 @@ FROM tags AS t
 INNER JOIN item_tags AS it ON t.id = it.tag_id
 WHERE item_id = ?
 ORDER BY t.slug";
-    const ADD_TAG: &str = "INSERT INTO tags (name, slug) VALUES (?,?) ON CONFLICT DO UPDATE SET slug = excluded.slug RETURNING id";
+    const ADD_TAG: &str = "INSERT INTO tags (name, slug) VALUES (?,?) ON CONFLICT (slug) DO UPDATE SET slug = excluded.slug RETURNING id";
     const ADD_ITEM_TAG: &str =
         "INSERT INTO item_tags (item_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
     const CLEAR_ITEM_TAGS: &str = "DELETE FROM item_tags WHERE item_id = ?";
@@ -304,7 +304,7 @@ DELETE FROM item_collections WHERE item_id = ? AND collection_id = ?
             .context("Creating collection")
     }
 
-    pub async fn delete_collecton(&self, collection_id: i32) -> color_eyre::Result<()> {
+    pub async fn delete_collection(&self, collection_id: i32) -> color_eyre::Result<()> {
         sqlx::query(Archive::DELETE_COLLECTION)
             .bind(collection_id)
             .execute(&self.pool)

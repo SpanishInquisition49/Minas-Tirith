@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use color_eyre::eyre::bail;
 use crossterm::event::Event;
 use ratatui::style::{Modifier, Style};
 use ratatui_textarea::{TextArea, WrapMode};
@@ -16,6 +19,31 @@ pub const FIELD_LABELS: [&str; 6] = [
     "Publication Date",
     "Tags",
 ];
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Field {
+    Title,
+    Description,
+    Doi,
+    Isbn,
+    PublicationDate,
+    Tags,
+}
+
+impl FromStr for Field {
+    type Err = color_eyre::eyre::Error;
+    fn from_str(s: &str) -> color_eyre::Result<Self> {
+        Ok(match s.to_lowercase().as_str() {
+            "title" => Field::Title,
+            "description" => Field::Description,
+            "doi" => Field::Doi,
+            "isbn" => Field::Isbn,
+            "publication date" => Field::PublicationDate,
+            "tags" => Field::Tags,
+            _ => bail!(format!("Could not convert {s} to Field")),
+        })
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct FormSnapshot {
@@ -77,7 +105,7 @@ impl ItemMetadata for FormSnapshot {
     }
 
     fn source(&self) -> String {
-        todo!()
+        String::default()
     }
 
     fn tags(&self) -> Vec<String> {
@@ -100,7 +128,7 @@ pub struct MetadataForm {
     pub item_type: ItemType,
     pub cover_image_url: Option<String>,
     pub authors: Vec<String>,
-    pub field_index: usize,
+    pub field: Field,
     pub editing: bool,
     pub container: Option<String>,
 }
@@ -117,7 +145,7 @@ impl MetadataForm {
             item_type: ItemType::Misc,
             cover_image_url: None,
             authors: Vec::new(),
-            field_index: 0,
+            field: Field::Title,
             editing: false,
             container: None,
         }
@@ -141,7 +169,7 @@ impl MetadataForm {
             item_type: candidate.item_type(),
             cover_image_url: candidate.cover_image_url(),
             authors: candidate.authors(),
-            field_index: 0,
+            field: Field::Title,
             editing: false,
             container: candidate.container(),
         }
@@ -182,7 +210,7 @@ impl MetadataForm {
             item_type,
             cover_image_url: item.fields.cover_image_url.clone(),
             authors: item.authors.iter().map(|a| a.name.clone()).collect(),
-            field_index: 0,
+            field: Field::Title,
             editing: false,
             container: item.fields.container.clone(),
         }
@@ -200,7 +228,7 @@ impl MetadataForm {
                 .tags
                 .value()
                 .split(",")
-                .map(|t| t.to_string())
+                .map(|t| t.trim().to_string())
                 .collect(),
             authors: self.authors.clone(),
             container: self.container.clone(),
@@ -227,14 +255,24 @@ impl MetadataForm {
     }
 
     pub fn next_field(&mut self) {
-        self.field_index = (self.field_index + 1) % FIELD_LABELS.len();
+        self.field = match self.field {
+            Field::Title => Field::Description,
+            Field::Description => Field::Doi,
+            Field::Doi => Field::Isbn,
+            Field::Isbn => Field::PublicationDate,
+            Field::PublicationDate => Field::Tags,
+            Field::Tags => Field::Title,
+        };
     }
 
     pub fn prev_field(&mut self) {
-        self.field_index = if self.field_index == 0 {
-            FIELD_LABELS.len() - 1
-        } else {
-            self.field_index - 1
+        self.field = match self.field {
+            Field::Title => Field::Tags,
+            Field::Description => Field::Title,
+            Field::Doi => Field::Description,
+            Field::Isbn => Field::Doi,
+            Field::PublicationDate => Field::Isbn,
+            Field::Tags => Field::PublicationDate,
         }
     }
 
@@ -249,19 +287,18 @@ impl MetadataForm {
     }
 
     pub fn handle_event(&mut self, event: &Event) {
-        match self.field_index {
-            0 => self.title.handle_event(event),
-            1 => {
+        match self.field {
+            Field::Title => self.title.handle_event(event),
+            Field::Description => {
                 if let Event::Key(key) = event {
                     self.description.input(*key);
                 }
                 None
             }
-            2 => self.doi.handle_event(event),
-            3 => self.isbn.handle_event(event),
-            4 => self.publication_date.handle_event(event),
-            5 => self.tags.handle_event(event),
-            _ => unreachable!(),
+            Field::Doi => self.doi.handle_event(event),
+            Field::Isbn => self.isbn.handle_event(event),
+            Field::PublicationDate => self.publication_date.handle_event(event),
+            Field::Tags => self.tags.handle_event(event),
         };
     }
 }

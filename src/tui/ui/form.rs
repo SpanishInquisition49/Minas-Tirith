@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -7,7 +9,10 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Padding, Paragraph},
 };
 
-use crate::{schema::form::FIELD_LABELS, tui::app::App};
+use crate::{
+    schema::form::{FIELD_LABELS, Field},
+    tui::app::App,
+};
 
 pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     let center = f
@@ -15,11 +20,11 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         .centered(Constraint::Percentage(80), Constraint::Percentage(80));
     f.render_widget(Clear, center);
 
-    let Some(form) = &mut app.metadata_form else {
+    let Some(form) = &mut app.metadata.form else {
         return;
     };
 
-    let title = if app.saving {
+    let title = if app.metadata.saving {
         let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let frame = spinner[app.tick_counter % spinner.len()];
         app.tick_counter += 1;
@@ -66,7 +71,7 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     f.render_widget(block, center);
 
     let mut lines: Vec<Line> = Vec::new();
-    if let Some(err) = &app.last_error {
+    if let Some(err) = &app.metadata.last_error {
         lines.push(Line::from(Span::styled(
             format!("Error: {err}"),
             Style::default().red(),
@@ -83,18 +88,20 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     ]));
     lines.push(Line::raw(""));
 
-    let field_index = form.field_index;
     let editing = form.editing;
 
     for (i, label) in FIELD_LABELS.iter().enumerate() {
-        let is_selected = i == field_index;
+        let Ok(current_field) = Field::from_str(label) else {
+            unreachable!() // NOTE: converting from the static array can't fail
+        };
+        let is_selected = form.field == current_field;
         let (style, title_style) = if is_selected {
             (Style::default().white(), Style::default().green())
         } else {
             (Style::default().dark_gray(), Style::default().yellow())
         };
 
-        if i == 1 {
+        if current_field == Field::Description {
             // Campo multi-riga: il widget gestisce da solo il proprio cursore,
             // non passa mai per f.set_cursor_position.
             let cursor_style = if editing && is_selected {
@@ -118,13 +125,13 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         }
 
         let width = rows[i].width.max(3) - 3;
-        let scroll = match i {
-            0 => form.title.visual_scroll(width as usize),
-            2 => form.doi.visual_scroll(width as usize),
-            3 => form.isbn.visual_scroll(width as usize),
-            4 => form.publication_date.visual_scroll(width as usize),
-            5 => form.tags.visual_scroll(width as usize),
-            _ => unreachable!(),
+        let scroll = match current_field {
+            Field::Title => form.title.visual_scroll(width as usize),
+            Field::Description => unreachable!(),
+            Field::Doi => form.doi.visual_scroll(width as usize),
+            Field::Isbn => form.isbn.visual_scroll(width as usize),
+            Field::PublicationDate => form.publication_date.visual_scroll(width as usize),
+            Field::Tags => form.tags.visual_scroll(width as usize),
         };
         let value = form.field_value(i);
 
@@ -140,13 +147,15 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         f.render_widget(input, rows[i]);
 
         if editing && is_selected {
-            let x = match i {
-                0 => form.title.visual_cursor().max(scroll) - scroll + 1,
-                2 => form.doi.visual_cursor().max(scroll) - scroll + 1,
-                3 => form.isbn.visual_cursor().max(scroll) - scroll + 1,
-                4 => form.publication_date.visual_cursor().max(scroll) - scroll + 1,
-                5 => form.tags.visual_cursor().max(scroll) - scroll + 1,
-                _ => unreachable!(),
+            let x = match current_field {
+                Field::Title => form.title.visual_cursor().max(scroll) - scroll + 1,
+                Field::Description => unreachable!(),
+                Field::Doi => form.doi.visual_cursor().max(scroll) - scroll + 1,
+                Field::Isbn => form.isbn.visual_cursor().max(scroll) - scroll + 1,
+                Field::PublicationDate => {
+                    form.publication_date.visual_cursor().max(scroll) - scroll + 1
+                }
+                Field::Tags => form.tags.visual_cursor().max(scroll) - scroll + 1,
             };
             f.set_cursor_position((rows[i].x + x as u16, rows[i].y + 1))
         }

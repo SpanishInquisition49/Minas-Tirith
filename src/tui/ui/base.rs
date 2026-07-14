@@ -8,7 +8,7 @@ use ratatui::{
     style::{Modifier, Style, Stylize},
     symbols::{self, border},
     text::Line,
-    widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph, Tabs},
+    widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Tabs},
 };
 use ratatui_explorer::Theme;
 
@@ -34,7 +34,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
         .split(main[0]);
 
-    let title = if app.is_searching {
+    let title = if app.metadata.is_searching {
         let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let frame = spinner[app.tick_counter % spinner.len()];
         app.tick_counter += 1;
@@ -78,7 +78,8 @@ fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
     f.render_widget(Clear, center);
 
     let items: Vec<ListItem> = app
-        .metadata_candidates
+        .metadata
+        .candidates
         .iter()
         .map(|c| {
             let authors = c.authors().join(", ");
@@ -109,7 +110,7 @@ fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
         )
         .highlight_style(Style::default().green());
 
-    f.render_stateful_widget(list, center, &mut app.metadata_list_state);
+    f.render_stateful_widget(list, center, &mut app.metadata.list_state);
 }
 
 fn draw_add_popup(f: &mut Frame, app: &mut App) {

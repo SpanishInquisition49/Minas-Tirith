@@ -98,7 +98,7 @@ impl DatabaseItem {
                 }
                 '~' => out.push_str("\\textasciitilde{}"),
                 '^' => out.push_str("\\textasciicircum{}"),
-                '\\' => out.push_str("\\textasciibackslash"),
+                '\\' => out.push_str("\\textasciibackslash{}"),
                 _ => out.push(c),
             }
         }

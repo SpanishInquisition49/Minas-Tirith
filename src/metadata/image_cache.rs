@@ -54,10 +54,14 @@ impl ImageCache {
             .await
             .context("Reading cover image bytes")?;
 
-        let _ = tokio::fs::write(&path, &bytes)
+        if let Err(e) = tokio::fs::write(&path, &bytes)
             .await
-            .context("Writing cover image to cache");
-        Ok(path)
+            .context("Writing cover image to cache")
+        {
+            Err(e)
+        } else {
+            Ok(path)
+        }
     }
 
     pub fn generated_prefix(&self, item_id: i32) -> PathBuf {

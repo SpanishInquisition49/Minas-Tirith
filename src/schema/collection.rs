@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use ratatui::{style::Style, text::Span};
+use sqlx::types::chrono;
 
 use crate::schema::graphics::Spannable;
 
@@ -10,6 +11,24 @@ pub struct Collection {
     pub slug: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl Collection {
+    /// Get the All collection
+    pub fn trivial_collection() -> Self {
+        Self {
+            id: -1,
+            name: "All".to_string(),
+            slug: "all".to_string(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    /// Check if the given id is from the trivial collection
+    pub fn is_trivial_collection(id: i32) -> bool {
+        id == -1
+    }
 }
 
 impl Spannable for Collection {

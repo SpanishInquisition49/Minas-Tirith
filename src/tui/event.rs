@@ -5,12 +5,9 @@ use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::StreamExt;
 use ratatui::{Terminal, backend::Backend};
 use tokio::time::interval;
-use tui_input::backend::crossterm::EventHandler;
 
-use crate::tui::{
-    app::{App, Focus, Mode},
-    ui::base::draw,
-};
+use crate::tui::app::{App, Focus, Mode};
+use crate::tui::ui::base::draw;
 
 pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color_eyre::Result<()> {
     let mut events = EventStream::new();
@@ -30,11 +27,11 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
                     if let Mode::Insert = app.mode {
                         app.file_explorer.handle(&event)?;
                     };
-                    if let Mode::MetadataEdit = app.mode && let Some(form) = &mut app.metadata_form && form.editing {
+                    if let Mode::MetadataEdit = app.mode && let Some(form) = &mut app.metadata.form && form.editing {
                         form.handle_event(&event);
                     }
                     if let Mode::CollectionCreate = app.mode {
-                        app.collection_name_input.handle_event(&event);
+                        app.collections.handle_event(&event);
                     }
                     if let Event::Key(key) = event {
                         handle_key(app, key).await?;
@@ -114,12 +111,13 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
         },
         Mode::MetadataEdit => {
             let editing = app
-                .metadata_form
+                .metadata
+                .form
                 .as_ref()
                 .map(|f| f.editing)
                 .unwrap_or(false);
             if editing {
-                let Some(form) = app.metadata_form.as_mut() else {
+                let Some(form) = app.metadata.form.as_mut() else {
                     return Ok(());
                 };
                 match key.code {
@@ -131,22 +129,22 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                     (KeyModifiers::CONTROL, KeyCode::Char('s')) => app.confirm_metadata_form(),
 
                     (_, KeyCode::Char('j')) | (_, KeyCode::Down) => {
-                        if let Some(f) = app.metadata_form.as_mut() {
+                        if let Some(f) = app.metadata.form.as_mut() {
                             f.next_field();
                         }
                     }
                     (_, KeyCode::Char('k')) | (_, KeyCode::Up) => {
-                        if let Some(f) = app.metadata_form.as_mut() {
+                        if let Some(f) = app.metadata.form.as_mut() {
                             f.prev_field();
                         }
                     }
                     (_, KeyCode::Char('t')) => {
-                        if let Some(f) = app.metadata_form.as_mut() {
+                        if let Some(f) = app.metadata.form.as_mut() {
                             f.cycle_item_type();
                         }
                     }
                     (_, KeyCode::Enter) => {
-                        if let Some(f) = app.metadata_form.as_mut() {
+                        if let Some(f) = app.metadata.form.as_mut() {
                             f.editing = true;
                         }
                     }

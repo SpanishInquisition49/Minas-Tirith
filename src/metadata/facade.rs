@@ -5,8 +5,7 @@ use reqwest::Client;
 use crate::metadata::{
     common_metadata::ItemMetadata,
     providers::{
-        self, crosseref::CrossrefManager, openalex::OpenAlexManager,
-        openlibrary::OpenLibraryManager,
+        self, crossref::CrossrefManager, openalex::OpenAlexManager, openlibrary::OpenLibraryManager,
     },
     proxy::MetadataFetcher,
 };

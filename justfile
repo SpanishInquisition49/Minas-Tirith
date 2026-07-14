@@ -1,5 +1,5 @@
 run:
-  cargo run -- --file./examples/01-factorial.txt 5
+  cargo run
 
 build:
   cargo build --release
