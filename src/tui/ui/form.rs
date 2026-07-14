@@ -59,13 +59,15 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Ratio(1, 8),
-            Constraint::Ratio(2, 8),
-            Constraint::Ratio(1, 8),
-            Constraint::Ratio(1, 8),
-            Constraint::Ratio(1, 8),
-            Constraint::Ratio(1, 8),
-            Constraint::Ratio(1, 8),
+            Constraint::Ratio(1, 10),
+            Constraint::Ratio(2, 10),
+            Constraint::Ratio(1, 10),
+            Constraint::Ratio(1, 10),
+            Constraint::Ratio(1, 10),
+            Constraint::Ratio(1, 10),
+            Constraint::Ratio(1, 10),
+            Constraint::Ratio(1, 10),
+            Constraint::Ratio(1, 10),
         ])
         .split(inner);
     f.render_widget(block, center);
@@ -82,11 +84,6 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         form.item_type.to_string().into(),
         " (press 't' to cylce)".dim(),
     ]));
-    lines.push(Line::from(vec![
-        "Container: ".bold(),
-        form.container.clone().unwrap_or_default().into(),
-    ]));
-    lines.push(Line::raw(""));
 
     let editing = form.editing;
 
@@ -132,15 +129,18 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
             Field::Isbn => form.isbn.visual_scroll(width as usize),
             Field::PublicationDate => form.publication_date.visual_scroll(width as usize),
             Field::Tags => form.tags.visual_scroll(width as usize),
+            Field::CoverUrl => form.cover_image_url.visual_scroll(width as usize),
+            Field::Container => form.container.visual_scroll(width as usize),
         };
-        let value = form.field_value(i);
+        let value = form.field_value(&current_field);
+        let title = form.field_title(&current_field);
 
         let input = Paragraph::new(value)
             .style(style)
             .scroll((0, scroll as u16))
             .block(
                 Block::bordered()
-                    .title(format!(" {label} "))
+                    .title(format!(" {title} "))
                     .border_style(Style::default().blue())
                     .title_style(title_style),
             );
@@ -156,9 +156,11 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
                     form.publication_date.visual_cursor().max(scroll) - scroll + 1
                 }
                 Field::Tags => form.tags.visual_cursor().max(scroll) - scroll + 1,
+                Field::CoverUrl => form.cover_image_url.visual_cursor().max(scroll) - scroll + 1,
+                Field::Container => form.container.visual_cursor().max(scroll) - scroll + 1,
             };
             f.set_cursor_position((rows[i].x + x as u16, rows[i].y + 1))
         }
     }
-    f.render_widget(Paragraph::new(lines), rows[6]);
+    f.render_widget(Paragraph::new(lines), rows[8]);
 }

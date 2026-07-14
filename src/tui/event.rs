@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use color_eyre::eyre::eyre;
+use color_eyre::eyre::bail;
 use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
 use futures::StreamExt;
 use ratatui::{Terminal, backend::Backend};
@@ -16,7 +16,7 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
     loop {
         // HACK: couldn't hoist the error with the '?' operator
         if let Err(e) = terminal.draw(|f| draw(f, app)) {
-            return Err(eyre!("{e}"));
+            bail!("{e}");
         }
 
         app.notifications.tick(Duration::from_millis(16));

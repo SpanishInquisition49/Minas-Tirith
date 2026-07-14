@@ -235,7 +235,12 @@ impl App {
         let Some(index) = self.items_list_state.selected() else {
             return Ok(());
         };
-        let Some(item) = self.items.get(index) else {
+        let filtered = self
+            .items
+            .iter()
+            .filter(|i| self.keep_items(i))
+            .collect::<Vec<_>>();
+        let Some(item) = filtered.get(index) else {
             return Ok(());
         };
         opener::open(PathBuf::from(&item.path))?;
@@ -423,12 +428,12 @@ impl App {
         };
         if applied {
             item.fields.description = data.abstract_text.clone();
-        } else {
             let title = item.fields.title.clone();
+            // NOTE: we could also notify on fail, but i think it's just annoying
             self.notify(
-                format!("Failed to find abstract for '{title}'"),
+                format!("Found abstact for '{title}'"),
                 " Fetching Metadata ".to_string(),
-                Level::Warn,
+                Level::Info,
             );
         }
     }

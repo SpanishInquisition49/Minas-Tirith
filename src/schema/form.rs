@@ -11,23 +11,27 @@ use crate::{
     schema::item::DatabaseItem,
 };
 
-pub const FIELD_LABELS: [&str; 6] = [
+pub const FIELD_LABELS: [&str; 8] = [
     "Title",
     "Description",
+    "Container",
     "DOI",
     "ISBN",
     "Publication Date",
     "Tags",
+    "Cover URL",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Field {
     Title,
     Description,
+    Container,
     Doi,
     Isbn,
     PublicationDate,
     Tags,
+    CoverUrl,
 }
 
 impl FromStr for Field {
@@ -36,10 +40,12 @@ impl FromStr for Field {
         Ok(match s.to_lowercase().as_str() {
             "title" => Field::Title,
             "description" => Field::Description,
+            "container" => Field::Container,
             "doi" => Field::Doi,
             "isbn" => Field::Isbn,
             "publication date" => Field::PublicationDate,
             "tags" => Field::Tags,
+            "cover url" => Field::CoverUrl,
             _ => bail!(format!("Could not convert {s} to Field")),
         })
     }
@@ -135,11 +141,11 @@ pub struct MetadataForm {
     pub publication_date: Input,
     pub tags: Input,
     pub item_type: ItemType,
-    pub cover_image_url: Option<String>,
+    pub cover_image_url: Input,
     pub authors: Vec<String>,
     pub field: Field,
     pub editing: bool,
-    pub container: Option<String>,
+    pub container: Input,
 }
 
 impl MetadataForm {
@@ -152,11 +158,11 @@ impl MetadataForm {
             publication_date: Input::default(),
             tags: Input::default(),
             item_type: ItemType::Misc,
-            cover_image_url: None,
+            cover_image_url: Input::default(),
             authors: Vec::new(),
             field: Field::Title,
             editing: false,
-            container: None,
+            container: Input::default(),
         }
     }
 
@@ -176,11 +182,11 @@ impl MetadataForm {
             publication_date: candidate.publication_date().unwrap_or_default().into(),
             tags: Input::new("".to_string()),
             item_type: candidate.item_type(),
-            cover_image_url: candidate.cover_image_url(),
+            cover_image_url: candidate.cover_image_url().unwrap_or_default().into(),
             authors: candidate.authors(),
             field: Field::Title,
             editing: false,
-            container: candidate.container(),
+            container: candidate.container().unwrap_or_default().into(),
         }
     }
 
@@ -217,15 +223,30 @@ impl MetadataForm {
                 .join(", ")
                 .into(),
             item_type,
-            cover_image_url: item.fields.cover_image_url.clone(),
+            cover_image_url: item
+                .fields
+                .cover_image_url
+                .clone()
+                .unwrap_or_default()
+                .into(),
             authors: item.authors.iter().map(|a| a.name.clone()).collect(),
             field: Field::Title,
             editing: false,
-            container: item.fields.container.clone(),
+            container: item.fields.container.clone().unwrap_or_default().into(),
         }
     }
 
     pub fn snapshot(&self) -> FormSnapshot {
+        let cover_image_url = if self.cover_image_url.value().trim().is_empty() {
+            None
+        } else {
+            Some(self.cover_image_url.value().trim().to_string())
+        };
+        let container = if self.container.value().trim().is_empty() {
+            None
+        } else {
+            Some(self.container.value().trim().to_string())
+        };
         FormSnapshot {
             title: self.title.value().to_string(),
             description: self.description.lines().join("\n"),
@@ -240,48 +261,66 @@ impl MetadataForm {
                 .map(|t| t.trim().to_string())
                 .collect(),
             authors: self.authors.clone(),
-            container: self.container.clone(),
-            cover_image_url: self.cover_image_url.clone(),
+            container,
+            cover_image_url,
         }
     }
 
-    pub fn field_value(&self, index: usize) -> String {
-        match index {
-            0 => self.title.to_string(),
-            1 => self
-                .description
-                .lines()
-                .iter()
-                .map(|l| l.to_string())
-                .collect::<Vec<_>>()
-                .join("\n"),
-            2 => self.doi.to_string(),
-            3 => self.isbn.to_string(),
-            4 => self.publication_date.to_string(),
-            5 => self.tags.to_string(),
-            _ => unreachable!(),
+    pub fn field_value(&self, field: &Field) -> String {
+        match field {
+            Field::Title => self.title.to_string(),
+            Field::Description => self.description.lines().join("\n"),
+            Field::Container => self.container.to_string(),
+            Field::Doi => self.doi.to_string(),
+            Field::Isbn => self.isbn.to_string(),
+            Field::PublicationDate => self.publication_date.to_string(),
+            Field::Tags => self.tags.to_string(),
+            Field::CoverUrl => self.cover_image_url.to_string(),
+        }
+    }
+
+    pub fn field_title(&self, field: &Field) -> String {
+        match field {
+            Field::Title => "Title".to_string(),
+            Field::Description => "Description".to_string(),
+            Field::Container => match self.item_type {
+                ItemType::Book => "Publisher".to_string(),
+                ItemType::Article => "Journal".to_string(),
+                ItemType::Report => "Institution".to_string(),
+                ItemType::Thesis => "University".to_string(),
+                ItemType::Misc => "How Published".to_string(),
+            },
+            Field::Doi => "DOI".to_string(),
+            Field::Isbn => "ISBN".to_string(),
+            Field::PublicationDate => "Publication Date".to_string(),
+            Field::Tags => "Tags".to_string(),
+            Field::CoverUrl => "Cover URL".to_string(),
         }
     }
 
     pub fn next_field(&mut self) {
         self.field = match self.field {
             Field::Title => Field::Description,
-            Field::Description => Field::Doi,
+            Field::Description => Field::Container,
+            Field::Container => Field::Doi,
             Field::Doi => Field::Isbn,
             Field::Isbn => Field::PublicationDate,
             Field::PublicationDate => Field::Tags,
-            Field::Tags => Field::Title,
+            Field::Tags => Field::CoverUrl,
+            Field::CoverUrl => Field::Title,
         };
     }
 
     pub fn prev_field(&mut self) {
         self.field = match self.field {
-            Field::Title => Field::Tags,
+            Field::Title => Field::CoverUrl,
             Field::Description => Field::Title,
-            Field::Doi => Field::Description,
+            Field::Container => Field::Description,
+            Field::Doi => Field::Container,
             Field::Isbn => Field::Doi,
             Field::PublicationDate => Field::Isbn,
             Field::Tags => Field::PublicationDate,
+            Field::CoverUrl => Field::Tags,
         }
     }
 
@@ -304,10 +343,12 @@ impl MetadataForm {
                 }
                 None
             }
+            Field::Container => self.container.handle_event(event),
             Field::Doi => self.doi.handle_event(event),
             Field::Isbn => self.isbn.handle_event(event),
             Field::PublicationDate => self.publication_date.handle_event(event),
             Field::Tags => self.tags.handle_event(event),
+            Field::CoverUrl => self.cover_image_url.handle_event(event),
         };
     }
 }
