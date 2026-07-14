@@ -19,15 +19,19 @@ It stores metadata in SQLite, fetches candidates from Open Library, Crossref, an
 - Edit metadata for already-saved publications
 - Open a saved file from the list
 - Copy the selected item's BibTeX entry to the system clipboard
-- Filter the item list by type
+- Copy BibTeX entries for the selected collection to the system clipboard
+- Filter the item list by type and by selected collection
+- Create and delete collections
+- Assign items to collections (from either the item list or collection view)
 - Display cached/downloaded covers, or generate covers from local files:
   - PDF: first page via `pdftoppm`
   - EPUB: embedded cover via `epub` crate
+- Auto-fetch missing abstracts for selected items when possible
 - Persist items, authors, and tags in SQLite through SQLx migrations
 
 ## Keybindings
 
-### Normal mode
+### Normal mode (items focus)
 
 | Key          | Action                                |
 | ------------ | ------------------------------------- |
@@ -37,10 +41,26 @@ It stores metadata in SQLite, fetches candidates from Open Library, Crossref, an
 | `a`          | Open file explorer (add flow)         |
 | `e`          | Edit selected item metadata           |
 | `b`          | Copy selected item as BibTeX          |
+| `c`          | Assign selected item to collections   |
 | `Enter`      | Open selected file with system opener |
+| `Tab`        | Switch focus to collections           |
 | `q`          | Quit                                  |
 
-### Insert mode (file explorer)
+### Normal mode (collections focus)
+
+| Key          | Action                                           |
+| ------------ | ------------------------------------------------ |
+| `j` / `Down` | Select next collection                           |
+| `k` / `Up`   | Select previous collection                       |
+| `n`          | Create a new collection                          |
+| `d`          | Delete selected collection                       |
+| `c`          | Assign items to selected collection              |
+| `b`          | Copy BibTeX for selected collection's items      |
+| `Enter`      | Use selected collection as active list filter    |
+| `Tab`        | Switch focus to items                            |
+| `q`          | Quit                                             |
+
+### Insert mode (file explorer popup)
 
 | Key                       | Action                                     |
 | ------------------------- | ------------------------------------------ |
@@ -67,6 +87,23 @@ It stores metadata in SQLite, fetches candidates from Open Library, Crossref, an
 | `Backspace`  | Delete char (while editing) |
 | `Ctrl+S`     | Save                        |
 | `Esc` / `q`  | Cancel                      |
+
+### Collection create popup
+
+| Key     | Action                      |
+| ------- | --------------------------- |
+| `Enter` | Create collection           |
+| `Esc`   | Cancel                      |
+
+### Collection assign popup
+
+| Key                    | Action                 |
+| ---------------------- | ---------------------- |
+| `j` / `Down`           | Next item/collection   |
+| `k` / `Up`             | Previous item/collection |
+| `Space` / `Enter`      | Toggle assignment      |
+| `Ctrl+S`               | Save assignments       |
+| `Esc` / `q`            | Cancel                 |
 
 ## Build and run
 
@@ -113,10 +150,9 @@ items ──┬── item_authors ──── authors
 
 ## Status
 
-This is still an early-stage project, but the core add/edit/open flow is functional and persisted through SQLite migrations.
+This is still an early-stage project, but the core add/edit/open flow is functional, persisted through SQLite migrations, and includes collection management plus BibTeX export for both single items and whole collections.
 
 Known limitations right now:
 
-- Search mode is not implemented yet
-- Collections management exists in schema but is not exposed in the UI
+- Search mode is still unfinished (`/` enters an unimplemented UI path)
 - UX and data model are still evolving
