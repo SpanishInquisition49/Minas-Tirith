@@ -106,6 +106,7 @@ impl CollectionState {
         if !name.is_empty() {
             self.archive.create_collection(&name).await?;
         }
+        self.refresh().await?;
         Ok(())
     }
 
