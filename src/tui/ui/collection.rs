@@ -7,7 +7,10 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph},
 };
 
-use crate::tui::app::{App, Focus, collection::AssignMode};
+use crate::{
+    schema::collection::Collection,
+    tui::app::{App, Focus, collection::AssignMode},
+};
 
 pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus, Focus::Collections);
@@ -111,6 +114,8 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
                 .collections
                 .items
                 .iter()
+                // NOTE: exclude the trivial collection "All"
+                .filter(|c| !Collection::is_trivial_collection(c.id))
                 .map(|c| {
                     let mark = if state.selected.contains(&c.id) {
                         "[x]"

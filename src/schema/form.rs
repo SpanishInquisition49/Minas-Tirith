@@ -109,7 +109,16 @@ impl ItemMetadata for FormSnapshot {
     }
 
     fn tags(&self) -> Vec<String> {
-        self.tags.iter().map(|t| t.to_string()).collect()
+        self.tags
+            .iter()
+            .filter_map(|t| {
+                if t.trim().is_empty() {
+                    None
+                } else {
+                    Some(t.trim().to_string())
+                }
+            })
+            .collect()
     }
 
     fn container(&self) -> Option<String> {

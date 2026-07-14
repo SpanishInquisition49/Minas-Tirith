@@ -65,7 +65,7 @@ VALUES (?,?,?,?)
 ON CONFLICT (slug) DO UPDATE SET
     slug = excluded.slug,
     given_name = excluded.given_name,
-    family_name = excluded.given_name
+    family_name = excluded.family_name
 RETURNING id";
     const ADD_ITEM_AUTHOR: &str = "
 INSERT INTO item_authors (item_id, author_id, author_order) 

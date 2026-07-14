@@ -164,17 +164,25 @@ impl App {
     }
 
     pub fn select_prev(&mut self) {
+        let len = self
+            .items
+            .iter()
+            .fold(0, |acc, i| if self.keep_items(i) { acc + 1 } else { acc });
         let i = match self.items_list_state.selected() {
             Some(i) if i > 0 => i - 1,
-            Some(_) => self.items.len() - 1,
+            Some(_) => len - 1,
             None => 0,
         };
         self.items_list_state.select(Some(i));
     }
 
     pub fn select_next(&mut self) {
+        let len = self
+            .items
+            .iter()
+            .fold(0, |acc, i| if self.keep_items(i) { acc + 1 } else { acc });
         let i = match self.items_list_state.selected() {
-            Some(i) if i + 1 < self.items.len() => i + 1,
+            Some(i) if i + 1 < len => i + 1,
             Some(_) => 0,
             None => 0,
         };
