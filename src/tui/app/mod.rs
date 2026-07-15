@@ -394,7 +394,7 @@ impl App {
         self.metadata.confirm_save();
     }
 
-    async fn handle_save_message(&mut self, outcome: &SaveOutcome) -> color_eyre::Result<()> {
+    async fn handle_save_message(&mut self, outcome: SaveOutcome) -> color_eyre::Result<()> {
         let saved = self.metadata.on_save_result(outcome);
         if saved {
             self.mode = Mode::Normal;
@@ -421,13 +421,13 @@ impl App {
             .request_abstract(id, has_description, title, doi, isbn);
     }
 
-    fn handle_abstract_message(&mut self, data: &AbstractData) {
+    fn handle_abstract_message(&mut self, data: AbstractData) {
+        let id = data.item_id;
         let applied = self.metadata.on_abstract_result(data);
-        let Some(item) = self.items.iter_mut().find(|i| i.id == data.item_id) else {
+        let Some(item) = self.items.iter_mut().find(|i| i.id == id) else {
             return;
         };
         if applied {
-            item.fields.description = data.abstract_text.clone();
             let title = item.fields.title.clone();
             // NOTE: we could also notify on fail, but i think it's just annoying
             self.notify(
@@ -533,12 +533,12 @@ impl App {
     pub async fn poll_messages(&mut self) -> color_eyre::Result<()> {
         while let Ok(message) = self.task_channel_rx.try_recv() {
             match message {
-                Message::Save(outcome) => self.handle_save_message(&outcome).await?,
+                Message::Save(outcome) => self.handle_save_message(outcome).await?,
                 Message::Metadata(candidates) => self.handle_metadata_search_message(candidates),
                 Message::ImageCover(cover_data) => {
                     self.covers.handle_message(*cover_data, &mut self.items)
                 }
-                Message::Abstract(abstract_data) => self.handle_abstract_message(&abstract_data),
+                Message::Abstract(abstract_data) => self.handle_abstract_message(abstract_data),
             }
         }
         Ok(())

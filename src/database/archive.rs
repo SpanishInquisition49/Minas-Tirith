@@ -102,10 +102,7 @@ DELETE FROM item_collections WHERE item_id = ? AND collection_id = ?
             .fetch_all(&self.pool)
             .await
             .context("Fetching Items")?;
-        Ok(items
-            .iter()
-            .map(|i| DatabaseItem::from(i.to_owned()))
-            .collect())
+        Ok(items.into_iter().map(DatabaseItem::from).collect())
     }
 
     pub async fn set_cover_image_url(

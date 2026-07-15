@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use color_eyre::eyre::Context;
@@ -136,24 +136,26 @@ impl OpenAlexItem {
         }
     }
 
-    fn institution(&self) -> Option<String> {
+    fn institution(&self) -> Option<Cow<'_, str>> {
         self.authorships
             .iter()
             .find_map(|a| a.institutions.first())
-            .and_then(|i| i.display_name.clone())
+            .and_then(|i| i.display_name.as_ref().map(|n| Cow::Borrowed(n.as_str())))
     }
 }
 
 impl ItemMetadata for OpenAlexItem {
-    fn title(&self) -> String {
-        self.title.clone().unwrap_or_default()
+    fn title(&self) -> Cow<'_, str> {
+        self.title
+            .as_deref()
+            .map_or_else(|| Cow::default(), |t| Cow::Borrowed(t))
     }
 
-    fn description(&self) -> Option<String> {
-        self.reconstruct_abstract()
+    fn description(&self) -> Option<Cow<'_, str>> {
+        self.reconstruct_abstract().map(|d| Cow::Owned(d))
     }
 
-    fn item_type(&self) -> crate::metadata::common_metadata::ItemType {
+    fn item_type(&self) -> ItemType {
         match self.work_type.as_str() {
             "article" | "preprint" | "paratext" => ItemType::Article,
             "book" | "book-chapter" | "monograph" | "edited-book" => ItemType::Book,
@@ -171,37 +173,37 @@ impl ItemMetadata for OpenAlexItem {
             .collect()
     }
 
-    fn isbn(&self) -> Option<String> {
+    fn isbn(&self) -> Option<Cow<'_, str>> {
         None
     }
 
-    fn doi(&self) -> Option<String> {
+    fn doi(&self) -> Option<Cow<'_, str>> {
         self.doi
             .as_ref()
-            .map(|d| d.trim_start_matches("https://doi.org/").to_string())
+            .map(|d| Cow::Borrowed(d.trim_start_matches("https://doi.org/")))
     }
 
-    fn publication_date(&self) -> Option<String> {
-        self.publication_year.map(|y| y.to_string())
+    fn publication_date(&self) -> Option<Cow<'_, str>> {
+        self.publication_year.map(|y| Cow::Owned(y.to_string()))
     }
 
-    fn cover_image_url(&self) -> Option<String> {
+    fn cover_image_url(&self) -> Option<Cow<'_, str>> {
         None
     }
 
-    fn source(&self) -> String {
-        "openalex".to_string()
+    fn source(&self) -> Cow<'_, str> {
+        Cow::Borrowed("openalex")
     }
 
     fn tags(&self) -> Vec<String> {
         vec![]
     }
 
-    fn container(&self) -> Option<String> {
+    fn container(&self) -> Option<Cow<'_, str>> {
         self.primary_location
             .as_ref()
             .and_then(|l| l.source.as_ref())
-            .and_then(|s| s.display_name.clone())
+            .and_then(|s| s.display_name.as_ref().map(|n| Cow::Borrowed(n.as_str())))
             .or_else(|| self.institution())
     }
 }

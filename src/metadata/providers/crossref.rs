@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use async_trait::async_trait;
 use color_eyre::eyre::Context;
@@ -54,8 +54,11 @@ struct CrossrefDate {
     date_parts: Vec<Vec<Option<i32>>>,
 }
 impl ItemMetadata for CrossrefItem {
-    fn title(&self) -> String {
-        self.title.clone().into_iter().next().unwrap_or_default()
+    fn title(&self) -> Cow<'_, str> {
+        match self.title.first().map(|s| s.as_str()) {
+            Some(title) => Cow::Borrowed(title),
+            None => Cow::default(),
+        }
     }
 
     fn item_type(&self) -> ItemType {
@@ -83,39 +86,41 @@ impl ItemMetadata for CrossrefItem {
         }
     }
 
-    fn isbn(&self) -> Option<String> {
+    fn isbn(&self) -> Option<Cow<'_, str>> {
         None
     }
 
-    fn doi(&self) -> Option<String> {
-        Some(self.doi.clone())
+    fn doi(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed(&self.doi))
     }
 
-    fn publication_date(&self) -> Option<String> {
+    fn publication_date(&self) -> Option<Cow<'_, str>> {
         self.issued.as_ref().and_then(|issued| {
             issued.date_parts.first().map(|parts| {
-                parts
+                let t = parts
                     .iter()
                     .filter_map(|p| p.map(|n| n.to_string()))
                     .collect::<Vec<_>>()
-                    .join("-")
+                    .join("-");
+                Cow::Owned(t)
             })
         })
     }
 
-    fn cover_image_url(&self) -> Option<String> {
+    fn cover_image_url(&self) -> Option<Cow<'_, str>> {
         None
     }
 
-    fn source(&self) -> String {
-        "crossref".to_string()
+    fn source(&self) -> Cow<'_, str> {
+        Cow::Borrowed("crossref")
     }
 
-    fn description(&self) -> Option<String> {
+    fn description(&self) -> Option<Cow<'_, str>> {
         self.abstract_text
             .as_deref()
             .map(strip_jats_tags)
             .filter(|s| !s.is_empty())
+            .map(|d| Cow::Owned(d))
     }
 
     fn tags(&self) -> Vec<String> {
@@ -141,8 +146,10 @@ impl ItemMetadata for CrossrefItem {
             .collect()
     }
 
-    fn container(&self) -> Option<String> {
-        self.container_title.first().cloned()
+    fn container(&self) -> Option<Cow<'_, str>> {
+        self.container_title
+            .first()
+            .map(|c| Cow::Borrowed(c.as_str()))
     }
 }
 
@@ -199,7 +206,7 @@ impl MetadataFetcher for CrossrefManager {
         } else {
             let parsed: CrossrefWorkResponse =
                 res.json().await.context("Crossref DOI json parsing")?;
-            Ok(parsed.message.description())
+            Ok(parsed.message.description().map(|d| d.to_string()))
         }
     }
 }

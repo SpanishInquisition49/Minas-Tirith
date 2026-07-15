@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use async_trait::async_trait;
 use color_eyre::eyre::Context;
@@ -31,8 +31,8 @@ pub struct OpenLibraryItem {
 }
 
 impl ItemMetadata for OpenLibraryItem {
-    fn title(&self) -> String {
-        self.title.clone()
+    fn title(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.title)
     }
 
     fn item_type(&self) -> ItemType {
@@ -47,34 +47,34 @@ impl ItemMetadata for OpenLibraryItem {
         }
     }
 
-    fn isbn(&self) -> Option<String> {
+    fn isbn(&self) -> Option<Cow<'_, str>> {
         if let Some(ia) = &self.ia {
             ia.iter()
                 .find_map(|s| s.strip_prefix("isbn_"))
-                .map(|s| s.to_string())
+                .map(|s| Cow::Borrowed(s))
         } else {
             None
         }
     }
 
-    fn doi(&self) -> Option<String> {
+    fn doi(&self) -> Option<Cow<'_, str>> {
         None
     }
 
-    fn publication_date(&self) -> Option<String> {
-        self.first_publish_year.map(|y| y.to_string())
+    fn publication_date(&self) -> Option<Cow<'_, str>> {
+        self.first_publish_year.map(|y| Cow::Owned(y.to_string()))
     }
 
-    fn cover_image_url(&self) -> Option<String> {
+    fn cover_image_url(&self) -> Option<Cow<'_, str>> {
         self.cover_url
-            .map(|id| format!("https://covers.openlibrary.org/b/id/{id}-L.jpg"))
+            .map(|id| Cow::Owned(format!("https://covers.openlibrary.org/b/id/{id}-L.jpg")))
     }
 
-    fn source(&self) -> String {
-        "openlibrary".to_string()
+    fn source(&self) -> Cow<'_, str> {
+        Cow::Borrowed("openlibrary")
     }
 
-    fn description(&self) -> Option<String> {
+    fn description(&self) -> Option<Cow<'_, str>> {
         None
     }
 
@@ -82,8 +82,8 @@ impl ItemMetadata for OpenLibraryItem {
         vec![]
     }
 
-    fn container(&self) -> Option<String> {
-        self.publisher.first().cloned()
+    fn container(&self) -> Option<Cow<'_, str>> {
+        self.publisher.first().map(|p| Cow::Borrowed(p.as_str()))
     }
 }
 

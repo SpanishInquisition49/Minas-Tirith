@@ -71,40 +71,47 @@ impl DatabaseItem {
         let key = self.cite_key();
         let year = self.year();
         let authors = self.autors_bibtex();
-        let mut fields: Vec<(&str, Option<String>)> = vec![
-            ("title", Some(Self::escape_bibtex(&self.fields.title))),
-            ("authors", authors),
-            ("year", year),
-            ("doi", self.fields.doi.clone()),
+        let title = Self::escape_bibtex(&self.fields.title);
+        let description =
+            Self::escape_bibtex(self.fields.description.as_deref().unwrap_or_default());
+        let mut fields: Vec<(&str, Option<&str>)> = vec![
+            ("title", Some(&title)),
+            ("authors", authors.as_deref()),
+            ("year", year.as_deref()),
+            ("doi", self.fields.doi.as_deref()),
         ];
 
         let entry_type = match item_type {
             ItemType::Book => {
-                fields.push(("publisher", self.fields.container.clone()));
-                fields.push(("isbn", self.fields.isbn.clone()));
+                fields.push(("publisher", self.fields.container.as_deref()));
+                fields.push(("isbn", self.fields.isbn.as_deref()));
                 "book"
             }
             ItemType::Article => {
-                fields.push(("journal", self.fields.container.clone()));
+                fields.push(("journal", self.fields.container.as_deref()));
                 "article"
             }
             ItemType::Report => {
-                fields.push(("institution", self.fields.container.clone()));
+                fields.push(("institution", self.fields.container.as_deref()));
                 "techreport"
             }
             ItemType::Thesis => {
-                fields.push(("school", self.fields.container.clone()));
+                fields.push(("school", self.fields.container.as_deref()));
                 "phdthesis"
             }
             ItemType::Misc => {
-                fields.push(("howpublished", self.fields.container.clone()));
-                fields.push((
-                    "note",
-                    self.fields.description.as_deref().map(Self::escape_bibtex),
-                ));
+                fields.push(("howpublished", self.fields.container.as_deref()));
                 "misc"
             }
         };
+
+        if item_type == ItemType::Misc && !description.is_empty() {
+            if !description.is_empty() {
+                fields.push(("abstract", Some(&description)));
+            }
+        } else if !description.is_empty() {
+            fields.push(("note", Some(&description)));
+        }
 
         let mut bibtex = format!("@{entry_type}{{{key},\n");
         for (name, value) in fields {
@@ -227,10 +234,10 @@ impl<T: ItemMetadata + Sized> From<&T> for Item {
             r#type: value.item_type().to_string(),
             doi: value.doi().map(|d| d.to_string()),
             isbn: value.isbn().map(|i| i.to_string()),
-            publication_date: value.publication_date(),
+            publication_date: value.publication_date().map(|d| d.to_string()),
             slug: value.slug(),
-            cover_image_url: value.cover_image_url(),
-            container: value.container(),
+            cover_image_url: value.cover_image_url().map(|u| u.to_string()),
+            container: value.container().map(|c| c.to_string()),
         }
     }
 }

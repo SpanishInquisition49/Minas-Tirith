@@ -176,7 +176,7 @@ impl MetadataEditState {
         });
     }
 
-    pub fn on_save_result(&mut self, outcome: &SaveOutcome) -> bool {
+    pub fn on_save_result(&mut self, outcome: SaveOutcome) -> bool {
         self.saving = false;
         match outcome {
             SaveOutcome::Saved => {
@@ -226,7 +226,7 @@ impl MetadataEditState {
         });
     }
 
-    pub fn on_abstract_result(&mut self, data: &AbstractData) -> bool {
+    pub fn on_abstract_result(&mut self, data: AbstractData) -> bool {
         self.pending_abstract.remove(&data.item_id);
         if data.abstract_text.is_none() {
             self.failed_abstract.insert(data.item_id);

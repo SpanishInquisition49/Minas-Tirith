@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{borrow::Cow, str::FromStr};
 
 use color_eyre::eyre::bail;
 use crossterm::event::Event;
@@ -66,52 +66,54 @@ pub struct FormSnapshot {
 }
 
 impl ItemMetadata for FormSnapshot {
-    fn title(&self) -> String {
-        self.title.to_string()
+    fn title(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.title)
     }
 
-    fn description(&self) -> Option<String> {
-        Some(self.description.clone())
+    fn description(&self) -> Option<Cow<'_, str>> {
+        Some(Cow::Borrowed(&self.description))
     }
 
     fn item_type(&self) -> ItemType {
-        self.item_type.clone()
+        self.item_type
     }
 
     fn authors(&self) -> Vec<String> {
         self.authors.clone()
     }
 
-    fn isbn(&self) -> Option<String> {
+    fn isbn(&self) -> Option<Cow<'_, str>> {
         if self.isbn.is_empty() {
             None
         } else {
-            Some(self.isbn.to_string())
+            Some(Cow::Borrowed(&self.isbn))
         }
     }
 
-    fn doi(&self) -> Option<String> {
+    fn doi(&self) -> Option<Cow<'_, str>> {
         if self.doi.is_empty() {
             None
         } else {
-            Some(self.doi.to_string())
+            Some(Cow::Borrowed(&self.doi))
         }
     }
 
-    fn publication_date(&self) -> Option<String> {
+    fn publication_date(&self) -> Option<Cow<'_, str>> {
         if self.publication_date.is_empty() {
             None
         } else {
-            Some(self.publication_date.to_string())
+            Some(Cow::Borrowed(&self.publication_date))
         }
     }
 
-    fn cover_image_url(&self) -> Option<String> {
-        self.cover_image_url.clone()
+    fn cover_image_url(&self) -> Option<Cow<'_, str>> {
+        self.cover_image_url
+            .as_deref()
+            .map(|url| Cow::Borrowed(url))
     }
 
-    fn source(&self) -> String {
-        String::default()
+    fn source(&self) -> Cow<'_, str> {
+        Cow::default()
     }
 
     fn tags(&self) -> Vec<String> {
@@ -127,8 +129,8 @@ impl ItemMetadata for FormSnapshot {
             .collect()
     }
 
-    fn container(&self) -> Option<String> {
-        self.container.clone()
+    fn container(&self) -> Option<Cow<'_, str>> {
+        self.container.as_deref().map(|c| Cow::Borrowed(c))
     }
 }
 
@@ -168,7 +170,7 @@ impl MetadataForm {
 
     pub fn from_candidate(candidate: &dyn ItemMetadata) -> Self {
         Self {
-            title: candidate.title().into(),
+            title: candidate.title().to_string().into(),
             description: TextArea::new(
                 candidate
                     .description()
@@ -177,16 +179,24 @@ impl MetadataForm {
                     .map(|l| l.to_string())
                     .collect::<Vec<_>>(),
             ),
-            doi: candidate.doi().unwrap_or_default().into(),
-            isbn: candidate.isbn().unwrap_or_default().into(),
-            publication_date: candidate.publication_date().unwrap_or_default().into(),
+            doi: candidate.doi().unwrap_or_default().to_string().into(),
+            isbn: candidate.isbn().unwrap_or_default().to_string().into(),
+            publication_date: candidate
+                .publication_date()
+                .unwrap_or_default()
+                .to_string()
+                .into(),
             tags: Input::new("".to_string()),
             item_type: candidate.item_type(),
-            cover_image_url: candidate.cover_image_url().unwrap_or_default().into(),
+            cover_image_url: candidate
+                .cover_image_url()
+                .unwrap_or_default()
+                .to_string()
+                .into(),
             authors: candidate.authors(),
             field: Field::Title,
             editing: false,
-            container: candidate.container().unwrap_or_default().into(),
+            container: candidate.container().unwrap_or_default().to_string().into(),
         }
     }
 
@@ -236,7 +246,7 @@ impl MetadataForm {
         }
     }
 
-    pub fn snapshot(&self) -> FormSnapshot {
+    pub fn snapshot(self) -> FormSnapshot {
         let cover_image_url = if self.cover_image_url.value().trim().is_empty() {
             None
         } else {
@@ -250,7 +260,7 @@ impl MetadataForm {
         FormSnapshot {
             title: self.title.value().to_string(),
             description: self.description.lines().join("\n"),
-            item_type: self.item_type.clone(),
+            item_type: self.item_type,
             doi: self.doi.value().to_string(),
             isbn: self.isbn.value().to_string(),
             publication_date: self.publication_date.value().to_string(),
@@ -260,7 +270,7 @@ impl MetadataForm {
                 .split(",")
                 .map(|t| t.trim().to_string())
                 .collect(),
-            authors: self.authors.clone(),
+            authors: self.authors,
             container,
             cover_image_url,
         }

@@ -1,4 +1,5 @@
 use core::fmt;
+use std::borrow::Cow;
 
 use color_eyre::eyre::eyre;
 use human_name::Name;
@@ -6,17 +7,17 @@ use slug::slugify;
 
 /// Common interface for metadata from various providers
 pub trait ItemMetadata: Send {
-    fn title(&self) -> String;
-    fn description(&self) -> Option<String>;
+    fn title(&self) -> Cow<'_, str>;
+    fn description(&self) -> Option<Cow<'_, str>>;
     fn item_type(&self) -> ItemType;
     fn authors(&self) -> Vec<String>;
-    fn isbn(&self) -> Option<String>;
-    fn doi(&self) -> Option<String>;
-    fn publication_date(&self) -> Option<String>;
-    fn cover_image_url(&self) -> Option<String>;
-    fn source(&self) -> String;
+    fn isbn(&self) -> Option<Cow<'_, str>>;
+    fn doi(&self) -> Option<Cow<'_, str>>;
+    fn publication_date(&self) -> Option<Cow<'_, str>>;
+    fn cover_image_url(&self) -> Option<Cow<'_, str>>;
+    fn source(&self) -> Cow<'_, str>;
     fn tags(&self) -> Vec<String>;
-    fn container(&self) -> Option<String>;
+    fn container(&self) -> Option<Cow<'_, str>>;
 
     fn slug(&self) -> String {
         slugify(self.title())
@@ -43,7 +44,7 @@ pub trait ItemMetadata: Send {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Copy)]
 pub enum ItemType {
     Book,
     Article,

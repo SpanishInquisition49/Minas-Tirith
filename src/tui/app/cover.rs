@@ -114,13 +114,10 @@ impl CoverState {
                 let url = format!("file://{}", cover_path.display());
                 archive.set_cover_image_url(id, &url).await?;
 
-                let dyn_image = {
-                    let cover_path = cover_path.clone();
-                    tokio::task::spawn_blocking(move || image::open(&cover_path))
-                        .await
-                        .context("Joining image decode task")?
-                        .context("Decode generated cover image")?
-                };
+                let dyn_image = tokio::task::spawn_blocking(move || image::open(&cover_path))
+                    .await
+                    .context("Joining image decode task")?
+                    .context("Decode generated cover image")?;
                 Ok((picker.new_resize_protocol(dyn_image), url))
             }
             .await;
