@@ -4,8 +4,8 @@ use crate::metadata::common_metadata::ItemMetadata;
 
 #[derive(Debug)]
 pub enum SaveOutcome {
-    Saved,
-    Failed(String),
+    Saved { was_update: bool },
+    Failed { reason: String, was_update: bool },
 }
 
 pub struct CoverImageData {

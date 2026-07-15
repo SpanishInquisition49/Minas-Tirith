@@ -36,10 +36,6 @@ LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id";
     const ADD_ITEM: &str = "
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url, path, container)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
-ON CONFLICT (slug)
-DO UPDATE SET 
-    slug = excluded.slug,
-    container = COALESCE(excluded.container, container)
 RETURNING id
 ";
     const SET_ITEM_DESCRIPTION: &str = "UPDATE items SET description = ? WHERE id = ?";

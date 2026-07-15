@@ -13,6 +13,7 @@ use crate::{
     tui::app::traits::ListWidget,
 };
 
+#[derive(PartialEq, Eq, Debug)]
 pub enum EditContext {
     NewItem { path: PathBuf },
     ExistingItem { id: i32 },
@@ -159,33 +160,35 @@ impl MetadataEditState {
         let tx = self.tx.clone();
         let snapshot = form.snapshot();
         tokio::spawn(async move {
-            let result = match ctx {
-                EditContext::NewItem { path } => {
-                    archive.save_item_from_form(&snapshot, &path).await
-                }
+            let result = match &ctx {
+                EditContext::NewItem { path } => archive.save_item_from_form(&snapshot, path).await,
                 EditContext::ExistingItem { id } => {
-                    archive.update_item_from_form(id, &snapshot).await
+                    archive.update_item_from_form(*id, &snapshot).await
                 }
             };
+            let was_update = matches!(&ctx, EditContext::ExistingItem { id: _ });
             let outcome = match result {
-                Ok(_) => SaveOutcome::Saved,
-                Err(e) => SaveOutcome::Failed(e.to_string()),
+                Ok(_) => SaveOutcome::Saved { was_update },
+                Err(e) => SaveOutcome::Failed {
+                    reason: e.to_string(),
+                    was_update,
+                },
             };
 
             let _ = tx.send(Message::Save(outcome));
         });
     }
 
-    pub fn on_save_result(&mut self, outcome: SaveOutcome) -> bool {
+    pub fn on_save_result(&mut self, outcome: SaveOutcome) -> (bool, bool) {
         self.saving = false;
         match outcome {
-            SaveOutcome::Saved => {
+            SaveOutcome::Saved { was_update } => {
                 self.candidates.clear();
-                true
+                (true, was_update)
             }
-            SaveOutcome::Failed(err) => {
-                self.last_error = Some(err.to_string());
-                false
+            SaveOutcome::Failed { reason, was_update } => {
+                self.last_error = Some(reason.to_string());
+                (false, was_update)
             }
         }
     }

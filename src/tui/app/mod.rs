@@ -136,7 +136,7 @@ impl App {
             .title(title)
             .timing(
                 Timing::Fixed(Duration::from_millis(500)),
-                Timing::Fixed(Duration::from_secs(3)),
+                Timing::Fixed(Duration::from_secs(5)),
                 Timing::Fixed(Duration::from_millis(500)),
             )
             .border_style(Style::default().fg(match level {
@@ -417,11 +417,18 @@ impl App {
     }
 
     async fn handle_save_message(&mut self, outcome: SaveOutcome) -> color_eyre::Result<()> {
-        let saved = self.metadata.on_save_result(outcome);
+        let (saved, was_update) = self.metadata.on_save_result(outcome);
         if saved {
-            self.mode = Mode::Normal;
             self.request_refresh_item_list().await?;
+        } else {
+            let title = match was_update {
+                true => " Update tome ",
+                false => " Insert new tome ",
+            };
+            let reason = self.metadata.last_error.clone().unwrap_or_default();
+            self.notify(reason, title.to_string(), Level::Error);
         }
+        self.mode = Mode::Normal;
         Ok(())
     }
 
