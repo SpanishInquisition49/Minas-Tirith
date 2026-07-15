@@ -1,6 +1,12 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
+};
 
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use color_eyre::eyre::bail;
 use ratatui::{
     style::{Color, Style},
     widgets::ListState,
@@ -78,8 +84,11 @@ impl App {
         picker: Picker,
         cache: ImageCache,
     ) -> color_eyre::Result<Self> {
+        let Some(base_dirs) = directories::BaseDirs::new() else {
+            bail!("Cannot get home directory")
+        };
         let explorer = FileExplorerBuilder::default()
-            .working_dir(std::env::home_dir().unwrap())
+            .working_dir(base_dirs.home_dir())
             .filter_map(|f| {
                 if f.is_dir {
                     Some(f)
@@ -266,9 +275,22 @@ impl App {
                 .collect::<Vec<_>>()
         };
 
+        // NOTE: to handle possible cite keys overlap we keep track of the used keys
+        // and append to conflicting keys their version (an incremental counter)
         let mut bibtex = String::default();
+        let mut key_version_map: HashMap<String, usize> = HashMap::default();
         for item in filtered_items {
-            bibtex.push_str(&format!("{}\n", item.to_bibtex()));
+            let cite_key = item.cite_key();
+            let key = if key_version_map.contains_key(&cite_key) {
+                let version = key_version_map.get(&cite_key).copied().unwrap_or(1);
+                let key = format!("{}-{}", cite_key, version);
+                key_version_map.insert(cite_key, version + 1);
+                Some(key)
+            } else {
+                key_version_map.insert(cite_key, 1);
+                None
+            };
+            bibtex.push_str(&format!("{}\n", item.to_bibtex(key)));
         }
 
         match ClipboardContext::new() {
@@ -297,7 +319,7 @@ impl App {
             );
             return;
         };
-        let bibtex = item.to_bibtex();
+        let bibtex = item.to_bibtex(None);
 
         match ClipboardContext::new() {
             Ok(mut ctx) => {

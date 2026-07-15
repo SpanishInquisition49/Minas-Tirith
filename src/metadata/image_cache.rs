@@ -29,7 +29,7 @@ impl ImageCache {
             .rsplit('.')
             .next()
             .filter(|e| e.len() < 4 && e.chars().all(|c| c.is_ascii_alphabetic()))
-            .unwrap_or(".jpg");
+            .unwrap_or("jpg");
 
         self.cache_path.join(format!("{hash:x}.{extension}"))
     }

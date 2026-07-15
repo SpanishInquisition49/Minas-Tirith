@@ -120,7 +120,7 @@ impl ItemMetadata for CrossrefItem {
             .as_deref()
             .map(strip_jats_tags)
             .filter(|s| !s.is_empty())
-            .map(|d| Cow::Owned(d))
+            .map(Cow::Owned)
     }
 
     fn tags(&self) -> Vec<String> {

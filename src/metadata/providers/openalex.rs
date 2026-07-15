@@ -148,11 +148,11 @@ impl ItemMetadata for OpenAlexItem {
     fn title(&self) -> Cow<'_, str> {
         self.title
             .as_deref()
-            .map_or_else(|| Cow::default(), |t| Cow::Borrowed(t))
+            .map_or_else(Cow::default, Cow::Borrowed)
     }
 
     fn description(&self) -> Option<Cow<'_, str>> {
-        self.reconstruct_abstract().map(|d| Cow::Owned(d))
+        self.reconstruct_abstract().map(Cow::Owned)
     }
 
     fn item_type(&self) -> ItemType {

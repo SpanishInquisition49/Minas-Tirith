@@ -65,10 +65,13 @@ impl fmt::Display for DatabaseItem {
 }
 
 impl DatabaseItem {
-    pub fn to_bibtex(&self) -> String {
+    pub fn to_bibtex(&self, override_key: Option<String>) -> String {
         let item_type =
             ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::default());
-        let key = self.cite_key();
+        let key = match override_key {
+            None => self.cite_key(),
+            Some(key) => key,
+        };
         let year = self.year();
         let authors = self.autors_bibtex();
         let title = Self::escape_bibtex(&self.fields.title);
@@ -163,7 +166,7 @@ impl DatabaseItem {
             .map(str::to_string)
     }
 
-    fn cite_key(&self) -> String {
+    pub fn cite_key(&self) -> String {
         let author_last_name = self
             .authors
             .first()

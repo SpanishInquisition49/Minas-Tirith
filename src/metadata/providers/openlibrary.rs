@@ -51,7 +51,7 @@ impl ItemMetadata for OpenLibraryItem {
         if let Some(ia) = &self.ia {
             ia.iter()
                 .find_map(|s| s.strip_prefix("isbn_"))
-                .map(|s| Cow::Borrowed(s))
+                .map(Cow::Borrowed)
         } else {
             None
         }

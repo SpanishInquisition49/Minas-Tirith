@@ -107,9 +107,7 @@ impl ItemMetadata for FormSnapshot {
     }
 
     fn cover_image_url(&self) -> Option<Cow<'_, str>> {
-        self.cover_image_url
-            .as_deref()
-            .map(|url| Cow::Borrowed(url))
+        self.cover_image_url.as_deref().map(Cow::Borrowed)
     }
 
     fn source(&self) -> Cow<'_, str> {
@@ -130,7 +128,7 @@ impl ItemMetadata for FormSnapshot {
     }
 
     fn container(&self) -> Option<Cow<'_, str>> {
-        self.container.as_deref().map(|c| Cow::Borrowed(c))
+        self.container.as_deref().map(Cow::Borrowed)
     }
 }
 

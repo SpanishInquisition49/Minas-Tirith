@@ -17,6 +17,7 @@ pub struct CoverImageData {
 pub struct AbstractData {
     pub item_id: i32,
     pub abstract_text: Option<String>,
+    pub success: bool,
 }
 
 pub enum Message {

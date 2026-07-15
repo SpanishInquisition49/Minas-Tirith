@@ -216,21 +216,35 @@ impl MetadataEditState {
 
         tokio::spawn(async move {
             let abstract_text = provider.fetch_abstract(&title, doi, isbn).await;
-            if let Some(a) = &abstract_text {
-                let _ = archive.set_item_description(id, a).await;
-            }
-            let _ = tx.send(Message::Abstract(AbstractData {
-                item_id: id,
-                abstract_text,
-            }));
+            let msg = if let Some(a) = &abstract_text {
+                match archive.set_item_description(id, a).await {
+                    Ok(_) => AbstractData {
+                        item_id: id,
+                        abstract_text,
+                        success: true,
+                    },
+                    Err(e) => AbstractData {
+                        item_id: id,
+                        abstract_text: Some(e.to_string()),
+                        success: false,
+                    },
+                }
+            } else {
+                AbstractData {
+                    item_id: id,
+                    abstract_text: Some("Abstract not found".to_string()),
+                    success: false,
+                }
+            };
+            let _ = tx.send(Message::Abstract(msg));
         });
     }
 
     pub fn on_abstract_result(&mut self, data: AbstractData) -> bool {
         self.pending_abstract.remove(&data.item_id);
-        if data.abstract_text.is_none() {
+        if !data.success {
             self.failed_abstract.insert(data.item_id);
         }
-        data.abstract_text.is_some()
+        data.abstract_text.is_some() && data.success
     }
 }
