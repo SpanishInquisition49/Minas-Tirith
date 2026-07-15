@@ -107,10 +107,10 @@ impl DatabaseItem {
 
         if item_type == ItemType::Misc && !description.is_empty() {
             if !description.is_empty() {
-                fields.push(("abstract", Some(&description)));
+                fields.push(("note", Some(&description)));
             }
         } else if !description.is_empty() {
-            fields.push(("note", Some(&description)));
+            fields.push(("abstract", Some(&description)));
         }
 
         let mut bibtex = format!("@{entry_type}{{{key},\n");
