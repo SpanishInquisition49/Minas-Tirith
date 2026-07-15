@@ -218,15 +218,9 @@ fn wrap_labeled_field(
 }
 
 fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool) {
-    let placeholder_block = Block::default()
-        .borders(Borders::ALL)
-        .padding(Padding::uniform(1))
-        .border_style(Style::default().dim());
-
     if !has_cover_url {
-        let placeholder = Paragraph::new(" \nNo cover")
-            .alignment(ratatui::layout::Alignment::Center)
-            .block(placeholder_block);
+        let placeholder =
+            Paragraph::new(" \nNo cover").alignment(ratatui::layout::Alignment::Center);
         f.render_widget(placeholder, area);
         return;
     }
@@ -237,9 +231,8 @@ fn draw_cover_slot(f: &mut Frame, app: &mut App, area: Rect, has_cover_url: bool
             f.render_stateful_widget(StatefulImage::default(), area, protocol);
         }
         None => {
-            let placeholder = Paragraph::new("Loading…")
-                .alignment(ratatui::layout::Alignment::Center)
-                .block(placeholder_block);
+            let placeholder =
+                Paragraph::new("Loading…").alignment(ratatui::layout::Alignment::Center);
             f.render_widget(placeholder, area);
         }
     }

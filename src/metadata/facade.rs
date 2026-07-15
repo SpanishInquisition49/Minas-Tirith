@@ -5,7 +5,7 @@ use reqwest::Client;
 use crate::metadata::{
     common_metadata::ItemMetadata,
     providers::{
-        self, crossref::CrossrefManager, openalex::OpenAlexManager, openlibrary::OpenLibraryManager,
+        crossref::CrossrefManager, openalex::OpenAlexManager, openlibrary::OpenLibraryManager,
     },
     proxy::MetadataFetcher,
 };
@@ -29,6 +29,8 @@ impl MetadataProvider {
         }
     }
 
+    /// Kicks off the metadata fetching for all providers, and waits for their results
+    /// then aggregate them into a common vector
     pub async fn fetch(&self, title: &str) -> Vec<Box<dyn ItemMetadata>> {
         let mut res = Vec::new();
         let mut tasks = tokio::task::JoinSet::new();
@@ -45,6 +47,8 @@ impl MetadataProvider {
         res
     }
 
+    /// Kicks off a best effort abstract search for each provider
+    /// Returning `String` whenever a provider find a valid abstract, `None` otherwise
     pub async fn fetch_abstract(
         &self,
         title: &str,

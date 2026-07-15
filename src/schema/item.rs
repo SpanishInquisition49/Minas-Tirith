@@ -1,28 +1,56 @@
 use core::fmt;
 
 use human_name::Name;
+use serde::Deserialize;
 use slug::slugify;
-use sqlx::types::chrono::{DateTime, Utc};
+use sqlx::types::{
+    Json,
+    chrono::{DateTime, Utc},
+};
 
 use crate::{
     metadata::common_metadata::{ItemMetadata, ItemType},
     schema::{author::Author, collection::Collection, tag::Tag},
 };
 
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct DatabaseItem {
+#[derive(Clone, sqlx::FromRow, Deserialize, Debug)]
+pub struct RawItemRow {
     pub id: i32,
     pub path: String,
     #[sqlx(flatten)]
     pub fields: Item,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    #[sqlx(skip)]
+    pub authors: Option<sqlx::types::Json<Vec<Author>>>,
+    pub tags: Option<sqlx::types::Json<Vec<Tag>>>,
+    pub collections: Option<sqlx::types::Json<Vec<Collection>>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DatabaseItem {
+    pub id: i32,
+    pub path: String,
+    pub fields: Item,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub authors: Vec<Author>,
-    #[sqlx(skip)]
     pub tags: Vec<Tag>,
-    #[sqlx(skip)]
     pub collections: Vec<Collection>,
+}
+
+impl From<RawItemRow> for DatabaseItem {
+    fn from(value: RawItemRow) -> Self {
+        Self {
+            id: value.id,
+            path: value.path,
+            fields: value.fields,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+            authors: value.authors.map(|Json(v)| v).unwrap_or_default(),
+            tags: value.tags.map(|Json(v)| v).unwrap_or_default(),
+            collections: value.collections.map(|Json(v)| v).unwrap_or_default(),
+        }
+    }
 }
 
 impl fmt::Display for DatabaseItem {
@@ -152,7 +180,7 @@ impl DatabaseItem {
     }
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow, Deserialize)]
 pub struct Item {
     pub title: String,
     pub description: Option<String>,

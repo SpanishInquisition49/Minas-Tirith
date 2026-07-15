@@ -1,16 +1,13 @@
-use chrono::{DateTime, Utc};
 use ratatui::{style::Style, text::Span};
-use sqlx::types::chrono;
+use serde::Deserialize;
 
 use crate::schema::graphics::Spannable;
 
-#[derive(Clone, sqlx::FromRow, Debug)]
+#[derive(Clone, sqlx::FromRow, Deserialize, Debug)]
 pub struct Collection {
     pub id: i32,
     pub name: String,
     pub slug: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 impl Collection {
@@ -20,8 +17,6 @@ impl Collection {
             id: -1,
             name: "All".to_string(),
             slug: "all".to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
         }
     }
 

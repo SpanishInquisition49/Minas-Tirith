@@ -1,8 +1,9 @@
 use ratatui::{style::Style, text::Span};
+use serde::Deserialize;
 
 use crate::schema::graphics::Spannable;
 
-#[derive(Clone, Debug, sqlx::FromRow)]
+#[derive(Clone, Debug, Deserialize, sqlx::FromRow)]
 pub struct Tag {
     pub id: i64,
     pub name: String,

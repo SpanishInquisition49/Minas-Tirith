@@ -7,6 +7,7 @@ use sqlx::migrate::Migrator;
 use sqlx::{SqlitePool, sqlite::SqliteRow};
 
 use crate::schema::collection::Collection;
+use crate::schema::item::RawItemRow;
 use crate::{metadata::common_metadata::ItemMetadata, schema::item::DatabaseItem};
 
 static MIGRATOR: Migrator = sqlx::migrate!();
@@ -26,7 +27,12 @@ impl Archive {
     }
 
     // NOTE: Items Queries
-    const GET_ALL_ITEMS: &str = "SELECT * FROM items";
+    const GET_ALL_ITEMS: &str = "SELECT
+    i.*, c.collections, a.authors, t.tags
+FROM items AS i
+LEFT JOIN view_collections_aggregated AS c ON c.item_id = i.id
+LEFT JOIN view_authors_aggregated AS a ON a.item_id = i.id
+LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id";
     const ADD_ITEM: &str = "
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url, path, container)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
@@ -53,12 +59,6 @@ SET
 WHERE id = ?
 ";
     // NOTE: Authors Queries
-    const GET_AUTHORS_FOR_ITEM: &str = "
-SELECT a.*
-FROM authors AS a
-INNER JOIN item_authors AS ia ON a.id = ia.author_id
-WHERE item_id = ?
-ORDER BY ia.author_order";
     const ADD_AUTHOR: &str = "
 INSERT INTO authors (name, slug, given_name, family_name)
 VALUES (?,?,?,?)
@@ -72,12 +72,6 @@ INSERT INTO item_authors (item_id, author_id, author_order)
 VALUES (?, ?, ?) ON CONFLICT DO NOTHING";
 
     // NOTE: Tags Queries
-    const GET_TAGS_FOR_ITEM: &str = "
-SELECT t.*
-FROM tags AS t
-INNER JOIN item_tags AS it ON t.id = it.tag_id
-WHERE item_id = ?
-ORDER BY t.slug";
     const ADD_TAG: &str = "INSERT INTO tags (name, slug) VALUES (?,?) ON CONFLICT (slug) DO UPDATE SET slug = excluded.slug RETURNING id";
     const ADD_ITEM_TAG: &str =
         "INSERT INTO item_tags (item_id, tag_id) VALUES (?, ?) ON CONFLICT DO NOTHING";
@@ -85,12 +79,6 @@ ORDER BY t.slug";
 
     // NOTE: Collections Queries
     const GET_ALL_COLLECTIONS: &str = "SELECT * FROM collections ORDER BY name";
-    const GET_COLLECTIONS_FOR_ITEM: &str = "
-SELECT c.*
-FROM collections AS c
-INNER JOIN item_collections AS ic ON c.id = ic.collection_id
-WHERE ic.item_id = ?
-ORDER BY c.name";
     const CREATE_COLLECTION: &str = "
 INSERT INTO collections (name, slug)
 VALUES (?, ?)
@@ -110,36 +98,14 @@ DELETE FROM item_collections WHERE item_id = ? AND collection_id = ?
 ";
 
     pub async fn get_all_items(&self) -> color_eyre::Result<Vec<DatabaseItem>> {
-        // NOTE: STEP 1: fetch all items
-        let mut items: Vec<DatabaseItem> = sqlx::query_as(Archive::GET_ALL_ITEMS)
+        let items: Vec<RawItemRow> = sqlx::query_as(Archive::GET_ALL_ITEMS)
             .fetch_all(&self.pool)
             .await
             .context("Fetching Items")?;
-
-        // NOTE: STEP 2: fetch all authors and tags for each item
-        for item in &mut items {
-            let authors = sqlx::query_as(Archive::GET_AUTHORS_FOR_ITEM)
-                .bind(item.id)
-                .fetch_all(&self.pool)
-                .await
-                .context("Fetching authors for item")?;
-
-            let tags = sqlx::query_as(Archive::GET_TAGS_FOR_ITEM)
-                .bind(item.id)
-                .fetch_all(&self.pool)
-                .await
-                .context("Fetching tags for item")?;
-
-            let collections: Vec<Collection> = sqlx::query_as(Archive::GET_COLLECTIONS_FOR_ITEM)
-                .bind(item.id)
-                .fetch_all(&self.pool)
-                .await
-                .context("Fetching collections for item")?;
-            item.authors = authors;
-            item.tags = tags;
-            item.collections = collections;
-        }
-        Ok(items)
+        Ok(items
+            .iter()
+            .map(|i| DatabaseItem::from(i.to_owned()))
+            .collect())
     }
 
     pub async fn set_cover_image_url(

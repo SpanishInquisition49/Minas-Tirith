@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use color_eyre::eyre::{Context, eyre};
+use color_eyre::eyre::{Context, bail};
 
 use crate::metadata::image_cache::ImageCache;
 
@@ -31,7 +31,7 @@ pub async fn generate_from_pdf(
         .context("Running pdftoppm")?;
 
     if !status.success() {
-        return Err(eyre!("pdftoppm exited with status: {status}"));
+        bail!("pdftoppm exited with status: {status}");
     }
 
     let out = prefix.with_extension("png");

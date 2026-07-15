@@ -62,7 +62,7 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     match app.mode {
         Mode::Normal => {}                      // NO additional rendering
         Mode::Insert => draw_add_popup(f, app), // Add item popup
-        Mode::Search => todo!(),
+        Mode::Search => {}                      // TODO: add the search feature
         Mode::MetadataSelect => draw_metadata_select_popup(f, app),
         Mode::MetadataEdit => draw_metadata_edit_popup(f, app),
         Mode::CollectionCreate => draw_collection_create_popup(f, app),

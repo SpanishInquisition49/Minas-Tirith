@@ -1,20 +1,16 @@
 use core::fmt;
-
-use chrono::{DateTime, Utc};
 use ratatui::{style::Style, text::Span};
+use serde::Deserialize;
 
 use crate::schema::graphics::Spannable;
 
-#[derive(Clone, sqlx::FromRow, Debug)]
+#[derive(Clone, sqlx::FromRow, Deserialize, Debug)]
 pub struct Author {
-    pub id: i64,
     pub name: String,
     pub slug: String,
     pub bio: Option<String>,
     pub given_name: Option<String>,
     pub family_name: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 impl fmt::Display for Author {
