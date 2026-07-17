@@ -32,7 +32,8 @@ impl Archive {
 FROM items AS i
 LEFT JOIN view_collections_aggregated AS c ON c.item_id = i.id
 LEFT JOIN view_authors_aggregated AS a ON a.item_id = i.id
-LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id";
+LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id
+ORDER BY i.title";
     const ADD_ITEM: &str = "
 INSERT INTO items (title, description, type, doi, isbn, publication_date, slug, cover_image_url, path, container)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
