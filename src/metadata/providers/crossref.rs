@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use async_trait::async_trait;
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{Context, bail};
 use reqwest::Client;
 
 use crate::metadata::{
@@ -172,19 +172,27 @@ impl MetadataFetcher for CrossrefManager {
         let base_url: &str = "https://api.crossref.org/works/";
         let res = client
             .get(base_url)
-            .query(&[("query.title", title), ("rows", "5".to_string())])
+            .query(&[("query.title", title.as_str()), ("rows", "5")])
             .send()
             .await
-            .context("Crosser API call")?;
-        let parsed: CrossrefResponse = res.json().await.context("Crossrer JSON parsing")?;
-        let items = parsed
-            .message
-            .items
-            .into_iter()
-            .filter(|i| !i.doi.is_empty() && !i.title.is_empty())
-            .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
-            .collect();
-        Ok(items)
+            .context("Crosser API call");
+        match res {
+            Ok(res) => {
+                let parsed: CrossrefResponse = res.json().await.context("Crossrer JSON parsing")?;
+                let items = parsed
+                    .message
+                    .items
+                    .into_iter()
+                    .filter(|i| !i.doi.is_empty() && !i.title.is_empty())
+                    .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
+                    .collect();
+                Ok(items)
+            }
+            Err(e) => {
+                tracing::error!(errore = %e, provider = self.name(), work_title = title, "Failed to fetch metadata");
+                bail!(e)
+            }
+        }
     }
 
     async fn fetch_abstract(

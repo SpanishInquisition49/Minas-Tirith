@@ -68,7 +68,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                     KeyCode::Char('j') | KeyCode::Down => app.select_next(),
                     KeyCode::Char('k') | KeyCode::Up => app.select_prev(),
                     KeyCode::Enter => app.request_file_opening()?,
-                    KeyCode::Char('a') => app.mode = Mode::Insert,
+                    KeyCode::Char('a') => app.request_open_file_picker()?,
                     KeyCode::Char('e') => {
                         app.open_metadata_edit_for_selected_item();
                     }

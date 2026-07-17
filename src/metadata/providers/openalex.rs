@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{Context, bail};
 use reqwest::Client;
 use serde::Deserialize;
 
@@ -26,21 +26,29 @@ impl MetadataFetcher for OpenAlexManager {
         client: Arc<Client>,
         title: String,
     ) -> color_eyre::Result<Vec<Box<dyn ItemMetadata>>> {
-        let query = vec![("search", title), ("per-page", "5".to_string())];
+        let query = vec![("search", title.as_str()), ("per-page", "5")];
         let res = client
             .get(Self::BASE_URL)
             .query(&query)
             .send()
             .await
-            .context("OpenAlex API call")?;
+            .context("OpenAlex API call");
 
-        let parsed: OpenAlexResponse = res.json().await.context("OpenAlex JSON parsing")?;
-        let items = parsed
-            .results
-            .into_iter()
-            .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
-            .collect();
-        Ok(items)
+        match res {
+            Ok(res) => {
+                let parsed: OpenAlexResponse = res.json().await.context("OpenAlex JSON parsing")?;
+                let items = parsed
+                    .results
+                    .into_iter()
+                    .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
+                    .collect();
+                Ok(items)
+            }
+            Err(e) => {
+                tracing::error!(errore = %e, provider = self.name(), work_title = title, "Failed to fetch metadata");
+                bail!(e)
+            }
+        }
     }
 
     async fn fetch_abstract(

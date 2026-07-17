@@ -86,7 +86,9 @@ impl MetadataEditState {
         let provider = self.provider.clone();
         tokio::spawn(async move {
             let candidates = provider.fetch(&filename).await;
-            let _ = tx.send(Message::Metadata(candidates));
+            if let Err(e) = tx.send(Message::Metadata(candidates)) {
+                tracing::error!(error = %e, "Failed to send candidates to the main task")
+            }
         });
     }
 
@@ -169,13 +171,18 @@ impl MetadataEditState {
             let was_update = matches!(&ctx, EditContext::ExistingItem { id: _ });
             let outcome = match result {
                 Ok(_) => SaveOutcome::Saved { was_update },
-                Err(e) => SaveOutcome::Failed {
-                    reason: e.to_string(),
-                    was_update,
-                },
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to write to database");
+                    SaveOutcome::Failed {
+                        reason: e.to_string(),
+                        was_update,
+                    }
+                }
             };
 
-            let _ = tx.send(Message::Save(outcome));
+            if let Err(e) = tx.send(Message::Save(outcome)) {
+                tracing::error!(error = %e, "Failed to send the saving outcome to the the main task")
+            }
         });
     }
 
@@ -226,11 +233,14 @@ impl MetadataEditState {
                         abstract_text,
                         success: true,
                     },
-                    Err(e) => AbstractData {
-                        item_id: id,
-                        abstract_text: Some(e.to_string()),
-                        success: false,
-                    },
+                    Err(e) => {
+                        tracing::warn!(error = %e, item_id = id, "Failed to save abstract to database");
+                        AbstractData {
+                            item_id: id,
+                            abstract_text: Some(e.to_string()),
+                            success: false,
+                        }
+                    }
                 }
             } else {
                 AbstractData {
@@ -239,7 +249,9 @@ impl MetadataEditState {
                     success: false,
                 }
             };
-            let _ = tx.send(Message::Abstract(msg));
+            if let Err(e) = tx.send(Message::Abstract(msg)) {
+                tracing::error!(error = %e, item_id = id, "Failed to send the abstact to the main task")
+            }
         });
     }
 

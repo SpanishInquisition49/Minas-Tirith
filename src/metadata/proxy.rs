@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{any::type_name, sync::Arc};
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -7,6 +7,11 @@ use crate::metadata::common_metadata::ItemMetadata;
 
 #[async_trait]
 pub trait MetadataFetcher: Send + Sync {
+    /// Get the real provider name for logging purpose
+    fn name(&self) -> &'static str {
+        type_name::<Self>()
+    }
+
     async fn fetch(
         &self,
         client: Arc<Client>,

@@ -116,13 +116,12 @@ fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
 fn draw_add_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()
-        .centered(Constraint::Percentage(60), Constraint::Percentage(20));
+        .centered(Constraint::Percentage(60), Constraint::Percentage(60));
     f.render_widget(Clear, center);
     f.render_widget_ref(app.file_explorer.widget(), center);
 }
 
 fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
-    let index = app.items_list_state.selected().unwrap_or_default() + 1;
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Max(1), Constraint::Fill(1)])
@@ -140,7 +139,16 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         .map(|i| ListItem::new(i.fields.title.clone()))
         .collect();
     let total = items.len();
-    let bottom_line = Line::from(format!(" {index} of {total} ").yellow());
+    let index = app.items_list_state.selected().unwrap_or_default();
+    let bottom_line = Line::from(format!(" {} of {total} ", index + 1).yellow());
+
+    // NOTE: when switching fro tabs to tabs if the index overflow or nothing was selected, select
+    // the first item
+    match app.items_list_state.selected() {
+        Some(i) if i > total && total > 0 => app.items_list_state.select(Some(0)),
+        None if total > 0 => app.items_list_state.select(Some(0)),
+        _ => {}
+    }
 
     let list = List::new(items)
         .block(

@@ -1,7 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
 use async_trait::async_trait;
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{Context, bail};
 use reqwest::Client;
 use serde::Deserialize;
 
@@ -103,18 +103,27 @@ impl MetadataFetcher for OpenLibraryManager {
         const BASE_URL: &str = "https://openlibrary.org/search.json";
         let res = client
             .get(BASE_URL)
-            .query(&[("title", title), ("limit", "5".to_string())])
+            .query(&[("title", title.as_str()), ("limit", "5")])
             .send()
             .await
-            .context("Open Library API call")?;
+            .context("Open Library API call");
 
-        let parsed: OpenLibraryResponse = res.json().await.context("Open Library JSON parsing")?;
-        let items = parsed
-            .docs
-            .into_iter()
-            .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
-            .collect();
+        match res {
+            Ok(res) => {
+                let parsed: OpenLibraryResponse =
+                    res.json().await.context("Open Library JSON parsing")?;
+                let items = parsed
+                    .docs
+                    .into_iter()
+                    .map(|i| Box::new(i) as Box<dyn ItemMetadata>)
+                    .collect();
 
-        Ok(items)
+                Ok(items)
+            }
+            Err(e) => {
+                tracing::error!(errore = %e, provider = self.name(), work_title = title, "Failed to fetch metadata");
+                bail!(e)
+            }
+        }
     }
 }

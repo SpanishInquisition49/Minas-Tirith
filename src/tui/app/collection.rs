@@ -70,6 +70,9 @@ impl CollectionState {
         // NOTE: Element 0 is the trivial collection "All"
         self.items.push(Collection::trivial_collection());
         self.items.extend(self.archive.get_all_collections().await?);
+        if self.list_state.selected().is_none() && !self.items.is_empty() {
+            self.list_state.select(Some(0));
+        }
         Ok(())
     }
 

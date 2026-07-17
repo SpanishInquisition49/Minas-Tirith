@@ -28,6 +28,7 @@ use crate::{
     },
     schema::{
         collection::Collection,
+        form::MetadataForm,
         item::DatabaseItem,
         message::{AbstractData, Message, SaveOutcome},
     },
@@ -84,26 +85,6 @@ impl App {
         picker: Picker,
         cache: ImageCache,
     ) -> color_eyre::Result<Self> {
-        let Some(base_dirs) = directories::BaseDirs::new() else {
-            bail!("Cannot get home directory")
-        };
-        let explorer = FileExplorerBuilder::default()
-            .working_dir(base_dirs.home_dir())
-            .filter_map(|f| {
-                if f.is_dir {
-                    Some(f)
-                } else {
-                    match f.path.extension() {
-                        Some(extension) => match extension.to_str() {
-                            Some("pdf") | Some("epub") => Some(f),
-                            _ => None,
-                        },
-                        None => None,
-                    }
-                }
-            })
-            .build()?;
-
         let (task_channel_tx, task_channel_rx) = mpsc::unbounded_channel();
         let task_channel_tx = Arc::new(task_channel_tx);
         let archive = Arc::new(archive);
@@ -117,7 +98,7 @@ impl App {
             items_list_state: ListState::default(),
             selectd_tab: 0,
             quit: false,
-            file_explorer: explorer,
+            file_explorer: Self::build_explorer(None)?,
             tick_counter: 0,
             metadata: MetadataEditState::new(archive.clone(), provider, task_channel_tx.clone()),
             covers: CoverState::new(archive.clone(), picker, cache, task_channel_tx.clone()),
@@ -131,8 +112,37 @@ impl App {
         Ok(app)
     }
 
+    /// Create a new file explorer, if specified open from the given working directory
+    fn build_explorer(working_dir: Option<&PathBuf>) -> color_eyre::Result<FileExplorer> {
+        let working_dir = match working_dir {
+            Some(dir) => dir,
+            None => {
+                let Some(base_dirs) = directories::BaseDirs::new() else {
+                    bail!("Cannot get home directory")
+                };
+                &base_dirs.home_dir().to_path_buf()
+            }
+        };
+        Ok(FileExplorerBuilder::default()
+            .working_dir(working_dir)
+            .filter_map(|f| {
+                if f.is_dir {
+                    Some(f)
+                } else {
+                    match f.path.extension() {
+                        Some(extension) => match extension.to_str() {
+                            Some("pdf") | Some("epub") => Some(f),
+                            _ => None,
+                        },
+                        None => None,
+                    }
+                }
+            })
+            .build()?)
+    }
+
     fn notify(&mut self, message: impl Into<String>, title: String, level: Level) {
-        if let Ok(notif) = Notification::new(message.into())
+        match Notification::new(message.into())
             .title(title)
             .timing(
                 Timing::Fixed(Duration::from_millis(500)),
@@ -152,7 +162,12 @@ impl App {
             .auto_dismiss(AutoDismiss::After(Duration::from_secs(2)))
             .build()
         {
-            let _ = self.notifications.add(notif);
+            Ok(notif) => {
+                let _ = self.notifications.add(notif);
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Could not build notification")
+            }
         }
     }
 
@@ -292,22 +307,7 @@ impl App {
             };
             bibtex.push_str(&format!("{}\n", item.to_bibtex(key)));
         }
-
-        match ClipboardContext::new() {
-            Ok(mut ctx) => {
-                let _ = ctx.set_contents(bibtex);
-                self.notify(
-                    "Copied Bibtex",
-                    "  Export collection ".to_string(),
-                    Level::Info,
-                );
-            }
-            Err(_) => self.notify(
-                "Clipboard unavailable",
-                " Export citation ".to_string(),
-                Level::Error,
-            ),
-        }
+        self.send_to_sys_clipboard(bibtex);
     }
 
     pub fn send_bibtex_to_system_clipboard(&mut self) {
@@ -321,21 +321,39 @@ impl App {
         };
         let bibtex = item.to_bibtex(None);
 
+        self.send_to_sys_clipboard(bibtex);
+    }
+
+    fn send_to_sys_clipboard(&mut self, content: String) {
         match ClipboardContext::new() {
-            Ok(mut ctx) => {
-                let _ = ctx.set_contents(bibtex);
+            Ok(mut ctx) => match ctx.set_contents(content) {
+                Ok(()) => {
+                    self.notify(
+                        "Copied Bibtex",
+                        "  Export collection ".to_string(),
+                        Level::Info,
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "Could not set contents of the system clipboard")
+                }
+            },
+            Err(e) => {
+                tracing::error!(error = %e, "Could not get system clipboard");
                 self.notify(
-                    "Copied Bibtex",
-                    "  Export citation ".to_string(),
-                    Level::Info,
-                );
+                    "Clipboard unavailable",
+                    " Export citation ".to_string(),
+                    Level::Error,
+                )
             }
-            Err(_) => self.notify(
-                "Clipboard unavailable",
-                " Export citation ".to_string(),
-                Level::Error,
-            ),
         }
+    }
+
+    pub fn request_open_file_picker(&mut self) -> color_eyre::Result<()> {
+        let cwd = self.file_explorer.cwd();
+        self.file_explorer = Self::build_explorer(Some(cwd))?;
+        self.mode = Mode::Insert;
+        Ok(())
     }
 
     pub fn request_cover_for_selected(&mut self) {
@@ -405,7 +423,7 @@ impl App {
         let Some(item) = self.selected_item() else {
             return;
         };
-        let form = crate::schema::form::MetadataForm::from_item(item);
+        let form = MetadataForm::from_item(item);
         let id = item.id;
         self.metadata
             .set_edit(form, EditContext::ExistingItem { id });
@@ -456,14 +474,17 @@ impl App {
         let Some(item) = self.items.iter_mut().find(|i| i.id == id) else {
             return;
         };
+        let title = item.fields.title.clone();
         if applied {
-            let title = item.fields.title.clone();
-            // NOTE: we could also notify on fail, but i think it's just annoying
             self.notify(
                 format!("Found abstact for '{title}'"),
                 " Fetching Metadata ".to_string(),
                 Level::Info,
             );
+        } else {
+            // NOTE: on failure we log instead of pushing a notification, is less annoying
+            // moreover, the fetching is fired without the user consent
+            tracing::warn!(item_id = id, "Could not find an abstract text")
         }
     }
 

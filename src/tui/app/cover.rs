@@ -88,12 +88,17 @@ impl CoverState {
             }
             .await;
 
-            if let Ok(protocol) = result {
-                let _ = tx.send(Message::ImageCover(Box::new(CoverImageData {
-                    item_id: id,
-                    protocol,
-                    url: None,
-                })));
+            match result {
+                Ok(protocol) => {
+                    if let Err(e) = tx.send(Message::ImageCover(Box::new(CoverImageData {
+                        item_id: id,
+                        protocol,
+                        url: None,
+                    }))) {
+                        tracing::error!(error = %e, item_id = id, "Failed to send the StatefulProtocol to the main task")
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, item_id = id, "Download cover failed"),
             }
         });
     }
@@ -122,12 +127,17 @@ impl CoverState {
             }
             .await;
 
-            if let Ok((protocol, url)) = result {
-                let _ = tx.send(Message::ImageCover(Box::new(CoverImageData {
-                    item_id: id,
-                    protocol,
-                    url: Some(url),
-                })));
+            match result {
+                Ok((protocol, url)) => {
+                    if let Err(e) = tx.send(Message::ImageCover(Box::new(CoverImageData {
+                        item_id: id,
+                        protocol,
+                        url: Some(url),
+                    }))) {
+                        tracing::error!(error = %e, item_id = id, "Failed to send the StatefulProtocol to the main task")
+                    }
+                }
+                Err(e) => tracing::warn!(error = %e, item_id = id, "Cover generation failed"),
             }
         });
     }
