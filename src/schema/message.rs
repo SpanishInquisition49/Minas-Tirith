@@ -1,6 +1,6 @@
 use ratatui_image::protocol::StatefulProtocol;
 
-use crate::metadata::common_metadata::ItemMetadata;
+use crate::metadata::dedup::MergedCandidate;
 
 #[derive(Debug)]
 pub enum SaveOutcome {
@@ -22,7 +22,7 @@ pub struct AbstractData {
 
 pub enum Message {
     Save(SaveOutcome),
-    Metadata(Vec<Box<dyn ItemMetadata>>),
+    Metadata(Vec<MergedCandidate>),
     ImageCover(Box<CoverImageData>),
     Abstract(AbstractData),
 }

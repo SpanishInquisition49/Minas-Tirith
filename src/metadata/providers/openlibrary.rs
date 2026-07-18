@@ -71,7 +71,7 @@ impl ItemMetadata for OpenLibraryItem {
     }
 
     fn source(&self) -> Cow<'_, str> {
-        Cow::Borrowed("openlibrary")
+        Cow::Borrowed("OpenLibrary")
     }
 
     fn description(&self) -> Option<Cow<'_, str>> {

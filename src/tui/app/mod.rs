@@ -23,6 +23,7 @@ use crate::{
     database::archive::Archive,
     metadata::{
         common_metadata::{ItemMetadata, ItemType},
+        dedup::MergedCandidate,
         facade::MetadataProvider,
         image_cache::ImageCache,
     },
@@ -385,7 +386,7 @@ impl App {
         self.metadata.request_fetch_candidates(filename);
     }
 
-    fn handle_metadata_search_message(&mut self, candidates: Vec<Box<dyn ItemMetadata>>) {
+    fn handle_metadata_search_message(&mut self, candidates: Vec<MergedCandidate>) {
         let path = self.file_explorer.current().path.clone();
         let has_candidates = self.metadata.on_search_results(candidates, path);
         if has_candidates {

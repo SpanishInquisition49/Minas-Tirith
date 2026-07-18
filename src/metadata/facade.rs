@@ -7,6 +7,7 @@ use crate::{
     app_config::AppConfig,
     metadata::{
         common_metadata::ItemMetadata,
+        dedup::MergedCandidate,
         providers::{
             core::CoreManager, crossref::CrossrefManager, google_books::GoogleBooksManager,
             openalex::OpenAlexManager, openlibrary::OpenLibraryManager,
@@ -47,7 +48,7 @@ impl MetadataProvider {
 
     /// Kicks off the metadata fetching for all providers, and waits for their results
     /// then aggregate them into a common vector
-    pub async fn fetch(&self, title: &str) -> Vec<Box<dyn ItemMetadata>> {
+    pub async fn fetch(&self, title: &str) -> Vec<MergedCandidate> {
         let mut res = Vec::new();
         let mut tasks = tokio::task::JoinSet::new();
         for provider in self.providers.iter() {
@@ -72,7 +73,7 @@ impl MetadataProvider {
         for metadata in tasks.join_all().await.into_iter().flatten() {
             res.push(metadata);
         }
-        res
+        MergedCandidate::merge_candidates(res)
     }
 
     /// Kicks off a best effort abstract search for each provider

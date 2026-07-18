@@ -5,7 +5,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     database::archive::Archive,
-    metadata::{common_metadata::ItemMetadata, facade::MetadataProvider},
+    metadata::{common_metadata::ItemMetadata, dedup::MergedCandidate, facade::MetadataProvider},
     schema::{
         form::MetadataForm,
         message::{AbstractData, Message, SaveOutcome},
@@ -24,7 +24,7 @@ pub struct MetadataEditState {
     provider: Arc<MetadataProvider>,
     tx: Arc<UnboundedSender<Message>>,
 
-    pub candidates: Vec<Box<dyn ItemMetadata>>,
+    pub candidates: Vec<MergedCandidate>,
     pub list_state: ListState,
     pub form: Option<MetadataForm>,
     pub edit_context: Option<EditContext>,
@@ -36,12 +36,12 @@ pub struct MetadataEditState {
     pub failed_abstract: HashSet<i32>,
 }
 
-impl ListWidget<Box<dyn ItemMetadata>> for MetadataEditState {
-    fn items(&self) -> &[Box<dyn ItemMetadata>] {
+impl ListWidget<MergedCandidate> for MetadataEditState {
+    fn items(&self) -> &[MergedCandidate] {
         &self.candidates
     }
 
-    fn items_mut(&mut self) -> &mut Vec<Box<dyn ItemMetadata>> {
+    fn items_mut(&mut self) -> &mut Vec<MergedCandidate> {
         &mut self.candidates
     }
 
@@ -96,7 +96,7 @@ impl MetadataEditState {
     /// if `false`, a black form for the new item has already be prepared as a fallback.
     pub fn on_search_results(
         &mut self,
-        candidates: Vec<Box<dyn ItemMetadata>>,
+        candidates: Vec<MergedCandidate>,
         fallback_path: PathBuf,
     ) -> bool {
         self.is_searching = false;
@@ -128,7 +128,7 @@ impl MetadataEditState {
             return false;
         };
 
-        self.form = Some(MetadataForm::from_candidate(candidate.as_ref()));
+        self.form = Some(MetadataForm::from_candidate(candidate));
         self.edit_context = Some(EditContext::NewItem { path });
         true
     }

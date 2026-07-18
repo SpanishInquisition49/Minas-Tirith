@@ -20,6 +20,7 @@ use crate::tui::{
         },
         details::draw_details,
         form::draw_metadata_edit_popup,
+        metadata_select::draw_metadata_select_popup,
     },
 };
 
@@ -69,48 +70,6 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::CollectionAssign => draw_collection_assign_popup(f, app),
     }
     app.notifications.render(f, f.area());
-}
-
-fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
-    let center = f
-        .area()
-        .centered(Constraint::Percentage(60), Constraint::Percentage(40));
-    f.render_widget(Clear, center);
-
-    let items: Vec<ListItem> = app
-        .metadata
-        .candidates
-        .iter()
-        .map(|c| {
-            let authors = c.authors().join(", ");
-            let date = c.publication_date().unwrap_or_default();
-            ListItem::new(format!(
-                "[{}] {}  —  {}  ({})",
-                c.source(),
-                c.title(),
-                authors,
-                date,
-            ))
-        })
-        .collect();
-
-    let list = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_set(border::THICK)
-                .border_style(Style::default().blue())
-                .padding(Padding::uniform(1))
-                .title(Line::from("Select metadata".bold()).yellow().italic())
-                .title_bottom(
-                    Line::from(" <Enter> Confirm  <Esc> Cancel ")
-                        .right_aligned()
-                        .yellow(),
-                ),
-        )
-        .highlight_style(Style::default().green());
-
-    f.render_stateful_widget(list, center, &mut app.metadata.list_state);
 }
 
 fn draw_add_popup(f: &mut Frame, app: &mut App) {

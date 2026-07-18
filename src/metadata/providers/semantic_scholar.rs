@@ -87,7 +87,7 @@ impl ItemMetadata for SemanticScholarItem {
     }
 
     fn source(&self) -> Cow<'_, str> {
-        Cow::Borrowed("semantic_scholar")
+        Cow::Borrowed("Semantic Scholar")
     }
 
     fn tags(&self) -> Vec<String> {

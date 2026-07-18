@@ -123,7 +123,7 @@ impl ItemMetadata for CoreItem {
     }
 
     fn source(&self) -> Cow<'_, str> {
-        Cow::Borrowed("core")
+        Cow::Borrowed("CORE")
     }
 
     fn tags(&self) -> Vec<String> {

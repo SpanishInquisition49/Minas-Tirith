@@ -105,7 +105,7 @@ impl ItemMetadata for GoogleBooksItem {
     }
 
     fn source(&self) -> Cow<'_, str> {
-        Cow::Borrowed("google_books")
+        Cow::Borrowed("Google Books")
     }
 
     fn tags(&self) -> Vec<String> {

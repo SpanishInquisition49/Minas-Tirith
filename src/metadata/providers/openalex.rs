@@ -200,7 +200,7 @@ impl ItemMetadata for OpenAlexItem {
     }
 
     fn source(&self) -> Cow<'_, str> {
-        Cow::Borrowed("openalex")
+        Cow::Borrowed("OpenAlex")
     }
 
     fn tags(&self) -> Vec<String> {

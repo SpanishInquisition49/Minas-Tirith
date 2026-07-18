@@ -112,7 +112,7 @@ impl ItemMetadata for CrossrefItem {
     }
 
     fn source(&self) -> Cow<'_, str> {
-        Cow::Borrowed("crossref")
+        Cow::Borrowed("Crossref")
     }
 
     fn description(&self) -> Option<Cow<'_, str>> {
