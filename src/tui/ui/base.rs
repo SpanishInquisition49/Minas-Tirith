@@ -12,15 +12,19 @@ use ratatui::{
 };
 use ratatui_explorer::Theme;
 
-use crate::tui::{
-    app::{App, Mode, TABS_LABELS},
-    ui::{
-        collection::{
-            draw_collection_assign_popup, draw_collection_create_popup, draw_collection_sidebar,
+use crate::{
+    peer2peer::PrettyDisplay,
+    schema::graphics::Spannable,
+    tui::{
+        app::{App, Mode, TABS_LABELS},
+        ui::{
+            collection::{
+                draw_collection_assign_popup, draw_collection_create_popup, draw_collection_sidebar,
+            },
+            details::draw_details,
+            form::draw_metadata_edit_popup,
+            metadata_select::draw_metadata_select_popup,
         },
-        details::draw_details,
-        form::draw_metadata_edit_popup,
-        metadata_select::draw_metadata_select_popup,
     },
 };
 
@@ -83,7 +87,7 @@ fn draw_add_popup(f: &mut Frame, app: &mut App) {
 fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Max(1), Constraint::Fill(1)])
+        .constraints([Constraint::Max(1), Constraint::Fill(1), Constraint::Fill(1)])
         .split(area);
     let tabs = Tabs::new(TABS_LABELS)
         .style(Style::default().italic())
@@ -120,10 +124,26 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         )
         .highlight_style(Style::default().green());
 
+    // TODO: change the position of this code, this is temporary for debug purpose
+    let peers = app.peers.iter().map(|i| i.to_span()).collect::<Vec<_>>();
+    let peer_list = List::new(peers).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_set(border::THICK)
+            .border_style(Style::default().blue())
+            .title(
+                format!(" {} ", app.share_node.pretty_name())
+                    .yellow()
+                    .italic()
+                    .bold(),
+            ),
+    );
+
     f.render_stateful_widget(
         list,
         rows[1] + Offset::new(0, -1),
         &mut app.items_list_state,
     );
     f.render_widget(tabs, rows[0] + Offset::new(1, 0));
+    f.render_widget(peer_list, rows[2]);
 }

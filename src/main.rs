@@ -20,6 +20,7 @@ use crate::{
 pub mod app_config;
 mod database;
 mod metadata;
+mod peer2peer;
 mod schema;
 mod tui;
 
@@ -93,7 +94,7 @@ async fn main() -> color_eyre::Result<()> {
         Picker::from_query_stdio().context("Querying terminal for image graphics protocol")?;
 
     let image_cache = ImageCache::new(get_image_cache_path(&proj_dirs));
-    let mut app = App::new(archive, picker, image_cache).await?;
+    let mut app = App::new(archive, picker, image_cache, &proj_dirs).await?;
     run(&mut terminal, &mut app).await?;
     ratatui::restore();
     Ok(())

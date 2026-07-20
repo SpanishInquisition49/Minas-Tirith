@@ -7,6 +7,8 @@ use std::{
 
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use color_eyre::eyre::bail;
+use directories::ProjectDirs;
+use iroh::SecretKey;
 use ratatui::{
     style::{Color, Style},
     widgets::ListState,
@@ -22,10 +24,12 @@ use tokio::sync::mpsc::{self, UnboundedReceiver};
 use crate::{
     database::archive::Archive,
     metadata::{
-        common_metadata::{ItemMetadata, ItemType},
-        dedup::MergedCandidate,
-        facade::MetadataProvider,
+        common_metadata::ItemType, dedup::MergedCandidate, facade::MetadataProvider,
         image_cache::ImageCache,
+    },
+    peer2peer::{
+        discovery::{PeerInfo, spawn_discovery_listener},
+        node::ShareNode,
     },
     schema::{
         collection::Collection,
@@ -76,6 +80,8 @@ pub struct App {
     pub covers: CoverState,
     pub collections: CollectionState,
     pub focus: Focus,
+    pub peers: Vec<PeerInfo>,
+    pub share_node: Arc<ShareNode>,
 
     task_channel_rx: UnboundedReceiver<Message>,
 }
@@ -85,11 +91,14 @@ impl App {
         archive: Archive,
         picker: Picker,
         cache: ImageCache,
+        proj_dirs: &ProjectDirs,
     ) -> color_eyre::Result<Self> {
         let (task_channel_tx, task_channel_rx) = mpsc::unbounded_channel();
         let task_channel_tx = Arc::new(task_channel_tx);
         let archive = Arc::new(archive);
         let provider = MetadataProvider::new();
+        let share_node = Arc::new(ShareNode::bind(proj_dirs.data_dir()).await?);
+        spawn_discovery_listener(share_node.clone(), task_channel_tx.clone());
 
         let mut app = Self {
             notifications: Notifications::new(),
@@ -106,6 +115,8 @@ impl App {
             collections: CollectionState::new(archive.clone()),
             focus: Focus::Items,
             task_channel_rx,
+            peers: Vec::new(),
+            share_node,
         };
         app.request_refresh_item_list().await?;
         app.request_refresh_collections().await?;
@@ -590,6 +601,14 @@ impl App {
                     self.covers.handle_message(*cover_data, &mut self.items)
                 }
                 Message::Abstract(abstract_data) => self.handle_abstract_message(abstract_data),
+                Message::PeerDiscovered(peer_info) => {
+                    if !self.peers.contains(&peer_info) {
+                        self.peers.push(peer_info);
+                    }
+                }
+                Message::PeerExpired(peer_info) => {
+                    self.peers.retain(|p| *p != peer_info);
+                }
             }
         }
         Ok(())

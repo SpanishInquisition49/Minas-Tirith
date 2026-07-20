@@ -1,6 +1,6 @@
 use ratatui_image::protocol::StatefulProtocol;
 
-use crate::metadata::dedup::MergedCandidate;
+use crate::{metadata::dedup::MergedCandidate, peer2peer::discovery::PeerInfo};
 
 #[derive(Debug)]
 pub enum SaveOutcome {
@@ -25,4 +25,6 @@ pub enum Message {
     Metadata(Vec<MergedCandidate>),
     ImageCover(Box<CoverImageData>),
     Abstract(AbstractData),
+    PeerDiscovered(PeerInfo),
+    PeerExpired(PeerInfo),
 }
