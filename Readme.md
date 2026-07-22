@@ -150,9 +150,14 @@ items ──┬── item_authors ──── authors
 
 ## Status
 
-This is still an early-stage project, but the core add/edit/open flow is functional, persisted through SQLite migrations, and includes collection management plus BibTeX export for both single items and whole collections.
+This repository is in **active development**.
+
+The local archive workflow is already usable end-to-end (add/edit/open items, metadata fetch, collections, BibTeX export, cover caching, and SQLite-backed persistence).
+
+Current work is focused on **peer-to-peer sharing** (publishing collections as shared libraries, subscribing via ticket, browsing shared papers, and importing them locally). That area is present in the codebase but still evolving.
 
 Known limitations right now:
 
 - Search mode is still unfinished (`/` enters an unimplemented UI path)
+- P2P/library-sharing UX and reliability are still being refined
 - UX and data model are still evolving
