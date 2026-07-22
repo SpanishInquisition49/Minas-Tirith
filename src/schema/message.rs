@@ -1,6 +1,12 @@
-use ratatui_image::protocol::StatefulProtocol;
+use std::path::PathBuf;
 
-use crate::{metadata::dedup::MergedCandidate, peer2peer::discovery::PeerInfo};
+use ratatui_image::protocol::StatefulProtocol;
+use uuid::Uuid;
+
+use crate::{
+    metadata::dedup::MergedCandidate,
+    peer2peer::{discovery::PeerInfo, library::SharedPaperEntry},
+};
 
 #[derive(Debug)]
 pub enum SaveOutcome {
@@ -27,4 +33,16 @@ pub enum Message {
     Abstract(AbstractData),
     PeerDiscovered(PeerInfo),
     PeerExpired(PeerInfo),
+    LibraryPapersDiscovered {
+        namespace_id: String,
+        papers: Vec<SharedPaperEntry>,
+    },
+    PaperDownloadReady {
+        entry: SharedPaperEntry,
+        local_path: PathBuf,
+    },
+    PaperDownloadFailed {
+        paper_id: Uuid,
+        reason: String,
+    },
 }

@@ -16,13 +16,16 @@ use crate::{
     peer2peer::PrettyDisplay,
     schema::graphics::Spannable,
     tui::{
-        app::{App, Mode, TABS_LABELS},
+        app::{App, Mode, TABS_LABELS, traits::ListWidget},
         ui::{
             collection::{
                 draw_collection_assign_popup, draw_collection_create_popup, draw_collection_sidebar,
             },
             details::draw_details,
             form::draw_metadata_edit_popup,
+            library::{
+                draw_library_browse_popup, draw_library_publish_popup, draw_library_subscribe_popup,
+            },
             metadata_select::draw_metadata_select_popup,
         },
     },
@@ -72,6 +75,9 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::MetadataEdit => draw_metadata_edit_popup(f, app),
         Mode::CollectionCreate => draw_collection_create_popup(f, app),
         Mode::CollectionAssign => draw_collection_assign_popup(f, app),
+        Mode::LibraryPublish => draw_library_publish_popup(f, app),
+        Mode::LibrarySubscribe => draw_library_subscribe_popup(f, app),
+        Mode::LibraryBrowse => draw_library_browse_popup(f, app),
     }
     app.notifications.render(f, f.area());
 }
@@ -125,14 +131,20 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         .highlight_style(Style::default().green());
 
     // TODO: change the position of this code, this is temporary for debug purpose
-    let peers = app.peers.iter().map(|i| i.to_span()).collect::<Vec<_>>();
+    let peers = app
+        .peers
+        .items()
+        .iter()
+        .map(|p| p.to_span())
+        .collect::<Vec<_>>();
+
     let peer_list = List::new(peers).block(
         Block::default()
             .borders(Borders::ALL)
             .border_set(border::THICK)
             .border_style(Style::default().blue())
             .title(
-                format!(" {} ", app.share_node.pretty_name())
+                format!(" {} ", app.peers.share_node.pretty_name())
                     .yellow()
                     .italic()
                     .bold(),

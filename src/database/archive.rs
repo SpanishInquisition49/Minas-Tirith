@@ -14,7 +14,7 @@ static MIGRATOR: Migrator = sqlx::migrate!();
 
 #[derive(Clone, Debug)]
 pub struct Archive {
-    pool: SqlitePool,
+    pub(in crate::database) pool: SqlitePool,
 }
 
 impl Archive {

@@ -14,6 +14,8 @@ static APP_CONFIG: OnceLock<AppConfig> = OnceLock::new();
 pub struct AppConfig {
     #[serde(default)]
     pub api_keys: HashMap<String, String>,
+    #[serde(default)]
+    pub ephemeral_identiy: bool,
 }
 
 impl AppConfig {
@@ -24,7 +26,7 @@ impl AppConfig {
             .map_err(|_| eyre!("AppConfig already initialized"))
     }
 
-    pub fn app_config() -> &'static AppConfig {
+    pub fn get() -> &'static AppConfig {
         APP_CONFIG
             .get()
             .expect("AppConfig::init() must be called before app_config()")

@@ -26,7 +26,7 @@ pub struct MetadataProvider {
 
 impl MetadataProvider {
     pub fn new() -> Self {
-        let cfg = AppConfig::app_config();
+        let cfg = AppConfig::get();
         let mut providers: Vec<Arc<dyn MetadataFetcher>> = vec![
             Arc::new(OpenLibraryManager::new()),
             Arc::new(CrossrefManager::new()),

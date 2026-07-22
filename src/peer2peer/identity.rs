@@ -3,10 +3,16 @@ use std::path::Path;
 use color_eyre::eyre::{Context, Result, eyre};
 use iroh::SecretKey;
 
+use crate::app_config::AppConfig;
+
 const KEY_FILENAME: &str = "share_identity.key";
 
 pub fn load_or_create_secret_key(data_dir: &Path) -> Result<SecretKey> {
     let path = data_dir.join(KEY_FILENAME);
+
+    if AppConfig::get().ephemeral_identiy {
+        return Ok(SecretKey::generate());
+    }
 
     if let Ok(bytes) = std::fs::read(&path) {
         let array: [u8; 32] = bytes

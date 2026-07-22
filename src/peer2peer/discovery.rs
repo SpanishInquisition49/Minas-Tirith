@@ -1,7 +1,4 @@
-use std::{
-    hash::{DefaultHasher, Hash, Hasher},
-    sync::Arc,
-};
+use std::{hash::Hash, sync::Arc};
 
 use futures::StreamExt;
 use iroh::PublicKey;
@@ -14,7 +11,7 @@ use crate::{
     schema::{graphics::Spannable, message::Message},
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PeerInfo {
     pub node_id: PublicKey,
 }

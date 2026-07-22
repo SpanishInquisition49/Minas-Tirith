@@ -6,9 +6,8 @@ use std::{
 };
 
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
-use color_eyre::eyre::bail;
+use color_eyre::{Result, eyre::bail};
 use directories::ProjectDirs;
-use iroh::SecretKey;
 use ratatui::{
     style::{Color, Style},
     widgets::ListState,
@@ -27,23 +26,25 @@ use crate::{
         common_metadata::ItemType, dedup::MergedCandidate, facade::MetadataProvider,
         image_cache::ImageCache,
     },
-    peer2peer::{
-        discovery::{PeerInfo, spawn_discovery_listener},
-        node::ShareNode,
-    },
+    peer2peer::library::SharedPaperEntry,
     schema::{
         collection::Collection,
         form::MetadataForm,
         item::DatabaseItem,
         message::{AbstractData, Message, SaveOutcome},
     },
-    tui::app::{collection::CollectionState, traits::ListWidget},
+    tui::app::{
+        collection::CollectionState, library::LibraryState, peer2peer::PeerState,
+        traits::ListWidget,
+    },
 };
 
 pub mod collection;
 mod cover;
+pub mod library;
 mod metadata_edit;
-mod traits;
+pub mod peer2peer;
+pub mod traits;
 
 pub use cover::CoverState;
 pub use metadata_edit::{EditContext, MetadataEditState};
@@ -61,11 +62,15 @@ pub enum Mode {
     MetadataEdit,
     CollectionCreate,
     CollectionAssign,
+    LibraryPublish,
+    LibrarySubscribe,
+    LibraryBrowse,
 }
 
 pub const TABS_LABELS: [&str; 6] = ["All", "Book", "Article", "Thesis", "Report", "Misc"];
 
 pub struct App {
+    // TODO: make all this fields private for other crates
     pub notifications: Notifications,
     pub archive: Arc<Archive>,
     pub mode: Mode,
@@ -79,9 +84,10 @@ pub struct App {
     pub metadata: MetadataEditState,
     pub covers: CoverState,
     pub collections: CollectionState,
+    pub peers: PeerState,
     pub focus: Focus,
-    pub peers: Vec<PeerInfo>,
-    pub share_node: Arc<ShareNode>,
+
+    pub library: LibraryState,
 
     task_channel_rx: UnboundedReceiver<Message>,
 }
@@ -92,13 +98,20 @@ impl App {
         picker: Picker,
         cache: ImageCache,
         proj_dirs: &ProjectDirs,
-    ) -> color_eyre::Result<Self> {
+    ) -> Result<Self> {
         let (task_channel_tx, task_channel_rx) = mpsc::unbounded_channel();
         let task_channel_tx = Arc::new(task_channel_tx);
+        let import_dir = proj_dirs.data_dir().join("tomes");
+        std::fs::create_dir_all(&import_dir);
         let archive = Arc::new(archive);
         let provider = MetadataProvider::new();
-        let share_node = Arc::new(ShareNode::bind(proj_dirs.data_dir()).await?);
-        spawn_discovery_listener(share_node.clone(), task_channel_tx.clone());
+        let peers = PeerState::new(proj_dirs, task_channel_tx.clone()).await?;
+        let library = LibraryState::new(
+            archive.clone(),
+            peers.share_node.clone(),
+            task_channel_tx.clone(),
+            import_dir,
+        );
 
         let mut app = Self {
             notifications: Notifications::new(),
@@ -114,18 +127,19 @@ impl App {
             covers: CoverState::new(archive.clone(), picker, cache, task_channel_tx.clone()),
             collections: CollectionState::new(archive.clone()),
             focus: Focus::Items,
+            peers,
             task_channel_rx,
-            peers: Vec::new(),
-            share_node,
+            library,
         };
         app.request_refresh_item_list().await?;
         app.request_refresh_collections().await?;
         app.request_cover_for_selected();
+        app.library.refresh().await?;
         Ok(app)
     }
 
     /// Create a new file explorer, if specified open from the given working directory
-    fn build_explorer(working_dir: Option<&PathBuf>) -> color_eyre::Result<FileExplorer> {
+    fn build_explorer(working_dir: Option<&PathBuf>) -> Result<FileExplorer> {
         let working_dir = match working_dir {
             Some(dir) => dir,
             None => {
@@ -259,7 +273,7 @@ impl App {
         self.items.iter().find(|i| i.fields.slug == slug)
     }
 
-    pub async fn request_refresh_item_list(&mut self) -> color_eyre::Result<()> {
+    pub async fn request_refresh_item_list(&mut self) -> Result<()> {
         self.items = self.archive.get_all_items().await?;
         if !self.items.is_empty() && self.items_list_state.selected().is_none() {
             self.items_list_state.select(Some(0));
@@ -267,7 +281,7 @@ impl App {
         Ok(())
     }
 
-    pub fn request_file_opening(&self) -> color_eyre::Result<()> {
+    pub fn request_file_opening(&self) -> Result<()> {
         let Some(index) = self.items_list_state.selected() else {
             return Ok(());
         };
@@ -361,7 +375,7 @@ impl App {
         }
     }
 
-    pub fn request_open_file_picker(&mut self) -> color_eyre::Result<()> {
+    pub fn request_open_file_picker(&mut self) -> Result<()> {
         let cwd = self.file_explorer.cwd();
         self.file_explorer = Self::build_explorer(Some(cwd))?;
         self.mode = Mode::Insert;
@@ -446,7 +460,7 @@ impl App {
         self.metadata.confirm_save();
     }
 
-    async fn handle_save_message(&mut self, outcome: SaveOutcome) -> color_eyre::Result<()> {
+    async fn handle_save_message(&mut self, outcome: SaveOutcome) -> Result<()> {
         let (saved, was_update) = self.metadata.on_save_result(outcome);
         if saved {
             self.request_refresh_item_list().await?;
@@ -507,7 +521,7 @@ impl App {
         }
     }
 
-    pub async fn request_refresh_collections(&mut self) -> color_eyre::Result<()> {
+    pub async fn request_refresh_collections(&mut self) -> Result<()> {
         self.collections.refresh().await
     }
 
@@ -527,7 +541,7 @@ impl App {
         }
     }
 
-    pub async fn delete_collection(&mut self) -> color_eyre::Result<()> {
+    pub async fn delete_collection(&mut self) -> Result<()> {
         if let Some(collection_id) = self.collections.delete_highlighted().await? {
             self.items
                 .iter_mut()
@@ -545,7 +559,7 @@ impl App {
         self.mode = Mode::Normal;
     }
 
-    pub async fn confirm_collection_create(&mut self) -> color_eyre::Result<()> {
+    pub async fn confirm_collection_create(&mut self) -> Result<()> {
         self.collections.confirm_create().await?;
         self.mode = Mode::Normal;
         Ok(())
@@ -585,14 +599,14 @@ impl App {
         self.mode = Mode::Normal;
     }
 
-    pub async fn confirm_collection_assign(&mut self) -> color_eyre::Result<()> {
+    pub async fn confirm_collection_assign(&mut self) -> Result<()> {
         self.collections.confirm_assign().await?;
         self.mode = Mode::Normal;
         self.request_refresh_item_list().await?;
         Ok(())
     }
 
-    pub async fn poll_messages(&mut self) -> color_eyre::Result<()> {
+    pub async fn poll_messages(&mut self) -> Result<()> {
         while let Ok(message) = self.task_channel_rx.try_recv() {
             match message {
                 Message::Save(outcome) => self.handle_save_message(outcome).await?,
@@ -601,16 +615,134 @@ impl App {
                     self.covers.handle_message(*cover_data, &mut self.items)
                 }
                 Message::Abstract(abstract_data) => self.handle_abstract_message(abstract_data),
-                Message::PeerDiscovered(peer_info) => {
-                    if !self.peers.contains(&peer_info) {
-                        self.peers.push(peer_info);
-                    }
+                Message::PeerDiscovered(peer_info) => self.peers.on_peer_discover(peer_info),
+                Message::PeerExpired(peer_info) => self.peers.on_peer_expiration(peer_info),
+                Message::LibraryPapersDiscovered {
+                    namespace_id,
+                    papers,
+                } => {
+                    self.library.handle_papers_discovered(namespace_id, papers);
                 }
-                Message::PeerExpired(peer_info) => {
-                    self.peers.retain(|p| *p != peer_info);
+                Message::PaperDownloadReady { entry, local_path } => {
+                    self.handle_paper_download_ready(entry, local_path);
+                }
+                Message::PaperDownloadFailed { reason, .. } => {
+                    self.notify(reason, " Download tome ".to_string(), Level::Error);
                 }
             }
         }
         Ok(())
+    }
+
+    pub async fn publish_collection_as_library(&mut self) -> Result<()> {
+        let Some(collection) = self.collections.selected() else {
+            return Ok(());
+        };
+
+        let items_in_collection: Vec<&DatabaseItem> = self
+            .items
+            .iter()
+            .filter(|i| i.collections.iter().any(|c| c.id == collection.id))
+            .collect();
+
+        match self.library.confirm_publish(&items_in_collection).await? {
+            Some(name) => {
+                self.notify(
+                    format!("Librery '{name}' published"),
+                    " Sharing ".to_string(),
+                    Level::Info,
+                );
+            }
+            // TODO: handle error
+            None => {}
+        }
+
+        Ok(())
+    }
+
+    pub async fn subscribe_to_library(
+        &mut self,
+        ticket_str: String,
+        nickname: String,
+    ) -> color_eyre::Result<()> {
+        self.library.subscribe(ticket_str, nickname).await
+    }
+
+    pub fn request_import_paper(&mut self, entry: SharedPaperEntry) {
+        self.library.request_import(entry);
+    }
+
+    pub fn handle_paper_download_ready(&mut self, entry: SharedPaperEntry, local_path: PathBuf) {
+        let form = MetadataForm::from_candidate(&entry);
+        self.metadata
+            .set_edit(form, EditContext::NewItem { path: local_path });
+        self.mode = Mode::MetadataEdit;
+    }
+
+    pub fn open_library_publish_for_selected(&mut self) {
+        let Some(id) = self.collections.highlighted_id() else {
+            return;
+        };
+        if Collection::is_trivial_collection(id) {
+            return;
+        }
+        let Some(name) = self.collections.items.iter().find_map(|c| {
+            if c.id == id {
+                Some(c.name.clone())
+            } else {
+                None
+            }
+        }) else {
+            return;
+        };
+        self.library.open_publish(id, name);
+        self.mode = Mode::LibraryPublish;
+    }
+
+    pub async fn confirm_library_publish(&mut self) -> color_eyre::Result<()> {
+        let Some(s) = &self.library.publish else {
+            return Ok(());
+        };
+        let collection_id = s.collection_id;
+        let items_in_collection: Vec<&DatabaseItem> = self
+            .items
+            .iter()
+            .filter(|i| i.collections.iter().any(|c| c.id == collection_id))
+            .collect();
+
+        self.library.confirm_publish(&items_in_collection).await?;
+        Ok(())
+    }
+
+    pub fn open_library_browse(&mut self) {
+        self.library.open_browse();
+        self.mode = Mode::LibraryBrowse;
+    }
+
+    pub async fn confirm_library_subscribe(&mut self) -> color_eyre::Result<()> {
+        let ok = self.library.confirm_subscribe().await?;
+        if ok {
+            self.mode = Mode::LibraryBrowse;
+            self.notify(
+                "Libreria sottoscritta",
+                " Condivisione ".to_string(),
+                Level::Info,
+            );
+        }
+        Ok(())
+    }
+
+    pub fn cancel_publish(&mut self) {
+        self.library.cancel_publish();
+        self.mode = Mode::Normal;
+    }
+
+    pub fn cancel_subscribe(&mut self) {
+        self.library.cancel_subscribe();
+        self.mode = Mode::Normal;
+    }
+
+    pub async fn refresh_current_library(&mut self) -> color_eyre::Result<()> {
+        self.library.refresh_current().await
     }
 }

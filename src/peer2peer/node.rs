@@ -1,7 +1,10 @@
 use std::path::Path;
 
-use color_eyre::eyre::{Context, Result};
-use iroh::{Endpoint, PublicKey, endpoint::presets};
+use color_eyre::eyre::{Context, Result, eyre};
+use iroh::{Endpoint, PublicKey, endpoint::presets, protocol::Router};
+use iroh_blobs::{BlobsProtocol, store::fs::FsStore};
+use iroh_docs::protocol::Docs;
+use iroh_gossip::Gossip;
 use iroh_mdns_address_lookup::MdnsAddressLookup;
 
 use crate::peer2peer::{PrettyDisplay, identity::load_or_create_secret_key};
@@ -9,8 +12,12 @@ use crate::peer2peer::{PrettyDisplay, identity::load_or_create_secret_key};
 const SERVICE_NAME: &str = "minastirith-share";
 
 pub struct ShareNode {
-    pub endpoint: Endpoint,
-    pub mdns: MdnsAddressLookup,
+    pub(in crate::peer2peer) endpoint: Endpoint,
+    pub(in crate::peer2peer) mdns: MdnsAddressLookup,
+    pub(in crate::peer2peer) router: Router,
+    pub(in crate::peer2peer) blobs_store: FsStore,
+    pub(in crate::peer2peer) gossip: Gossip,
+    pub docs: Docs,
 }
 
 impl ShareNode {
@@ -33,7 +40,38 @@ impl ShareNode {
             .context("Getting endpoint address lookup")?
             .add(mdns.clone());
 
-        Ok(Self { endpoint, mdns })
+        let store_dir = data_dir.join("store");
+        std::fs::create_dir_all(&store_dir).context("Creating blobs directory")?;
+        let blobs_store = FsStore::load(&store_dir)
+            .await
+            .context("Failed to create FsStore")?;
+
+        let gossip = Gossip::builder().spawn(endpoint.clone());
+        let docs_path = data_dir.join("docs");
+        std::fs::create_dir_all(&docs_path)?;
+        let docs = Docs::persistent(docs_path)
+            .spawn(endpoint.clone(), (*blobs_store).clone(), gossip.clone())
+            .await
+            .map_err(|e| eyre!("Spawning docs protocol: {}", e.to_string()))?;
+
+        let blobs_protocol = BlobsProtocol::new(&blobs_store, None);
+
+        let builder = Router::builder(endpoint.clone());
+
+        let router = builder
+            .accept(iroh_blobs::ALPN, blobs_protocol)
+            .accept(iroh_gossip::ALPN, gossip.clone())
+            .accept(iroh_docs::ALPN, docs.clone())
+            .spawn();
+
+        Ok(Self {
+            endpoint,
+            mdns,
+            router,
+            blobs_store,
+            gossip,
+            docs,
+        })
     }
 }
 

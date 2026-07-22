@@ -36,6 +36,12 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> color
                     if let Event::Key(key) = event {
                         handle_key(app, key).await?;
                     }
+                    if let Mode::LibraryPublish = app.mode {
+                        app.library.handle_publish_event(&event);
+                    }
+                    if let Mode::LibrarySubscribe = app.mode {
+                        app.library.handle_subscribe_event(&event);
+                    }
                 }
             }
             _ = tick.tick() => {
@@ -74,6 +80,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                     }
                     KeyCode::Char('b') => app.send_bibtex_to_system_clipboard(),
                     KeyCode::Char('c') => app.open_collection_assign_for_selected(),
+                    KeyCode::Char('L') => app.open_library_browse(),
                     KeyCode::Char('/') => app.mode = Mode::Search,
                     _ => {}
                 },
@@ -86,6 +93,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                     KeyCode::Char('d') => app.delete_collection().await?,
                     KeyCode::Enter => app.confirm_collection_selection(),
                     KeyCode::Char('q') => app.quit = true,
+                    KeyCode::Char('p') => app.open_library_publish_for_selected(),
                     _ => {}
                 },
             }
@@ -167,6 +175,36 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             (_, KeyCode::Char(' ')) | (_, KeyCode::Enter) => app.collection_assign_toggle_current(),
             (KeyModifiers::CONTROL, KeyCode::Char('s')) => app.confirm_collection_assign().await?,
             (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => app.cancel_collection_assign(),
+            _ => {}
+        },
+        Mode::LibraryPublish => match (key.modifiers, key.code) {
+            (_, KeyCode::Tab) => app.library.publish_next_field(),
+            (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
+                app.publish_collection_as_library().await?
+            }
+            (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => app.cancel_publish(),
+            _ => {}
+        },
+        Mode::LibrarySubscribe => match (key.modifiers, key.code) {
+            (_, KeyCode::Tab) => app.library.subscribe_next_field(),
+            (KeyModifiers::CONTROL, KeyCode::Char('s')) => app.confirm_library_subscribe().await?,
+            (_, KeyCode::Esc) => app.cancel_subscribe(),
+            _ => {}
+        },
+        Mode::LibraryBrowse => match key.code {
+            KeyCode::Tab => app.library.browse_toggle_focus(),
+            KeyCode::Char('j') | KeyCode::Down => app.library.browse_select_next(),
+            KeyCode::Char('k') | KeyCode::Up => app.library.browse_select_prev(),
+            KeyCode::Char('r') => app.refresh_current_library().await?,
+            KeyCode::Char('a') => {
+                app.library.open_subscribe();
+                app.mode = Mode::LibrarySubscribe;
+            }
+            KeyCode::Enter => app.library.browse_confirm_import(),
+            KeyCode::Esc => {
+                app.library.close_browse();
+                app.mode = Mode::Normal;
+            }
             _ => {}
         },
     }
