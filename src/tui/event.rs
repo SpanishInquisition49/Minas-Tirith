@@ -66,6 +66,10 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                 app.toggle_focus();
                 return Ok(());
             }
+            if let KeyCode::Char('?') = key.code {
+                app.open_help();
+                return Ok(());
+            }
             match app.focus {
                 Focus::Items => match key.code {
                     KeyCode::Char('[') => app.tabs_prev(),
@@ -94,6 +98,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
                     KeyCode::Enter => app.confirm_collection_selection(),
                     KeyCode::Char('q') => app.quit = true,
                     KeyCode::Char('p') => app.open_library_publish_for_selected(),
+                    KeyCode::Char('L') => app.open_library_manage(),
                     _ => {}
                 },
             }
@@ -196,6 +201,7 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             KeyCode::Char('j') | KeyCode::Down => app.library.browse_select_next(),
             KeyCode::Char('k') | KeyCode::Up => app.library.browse_select_prev(),
             KeyCode::Char('r') => app.refresh_current_library().await?,
+            KeyCode::Char('d') => app.unsubscribe_selected_library().await?,
             KeyCode::Char('a') => {
                 app.library.open_subscribe();
                 app.mode = Mode::LibrarySubscribe;
@@ -204,6 +210,31 @@ async fn handle_key(app: &mut App, key: KeyEvent) -> color_eyre::Result<()> {
             KeyCode::Esc => {
                 app.library.close_browse();
                 app.mode = Mode::Normal;
+            }
+            _ => {}
+        },
+        Mode::LibraryManage => match key.code {
+            KeyCode::Char('j') | KeyCode::Down => app.library.manage_select_next(),
+            KeyCode::Char('k') | KeyCode::Up => app.library.manage_select_prev(),
+            KeyCode::Char('t') => app.library.manage_generate_ticket().await?,
+            KeyCode::Char('c') => app.copy_current_ticket_to_clipboard(),
+            KeyCode::Char('d') => app.library.manage_delete_selected().await?,
+            KeyCode::Esc | KeyCode::Char('q') => {
+                app.library.close_manage();
+                app.mode = Mode::Normal;
+            }
+            _ => {}
+        },
+        Mode::Help => match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                app.help_scroll = app.help_scroll.saturating_add(1);
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                app.help_scroll = app.help_scroll.saturating_sub(1);
+            }
+            KeyCode::Esc | KeyCode::Char('q') => {
+                app.mode = Mode::Normal;
+                app.help_scroll = 0;
             }
             _ => {}
         },

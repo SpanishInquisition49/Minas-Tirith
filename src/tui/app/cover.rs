@@ -24,6 +24,7 @@ pub struct CoverState {
     tx: Arc<UnboundedSender<Message>>,
     covers: HashMap<i32, StatefulProtocol>,
     pending: HashSet<i32>,
+    failed: HashMap<i32, usize>,
 }
 
 impl CoverState {
@@ -40,6 +41,7 @@ impl CoverState {
             tx,
             covers: HashMap::default(),
             pending: HashSet::default(),
+            failed: HashMap::default(),
         }
     }
 

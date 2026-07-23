@@ -3,7 +3,6 @@ use std::{borrow::Cow, sync::Arc};
 use async_trait::async_trait;
 use color_eyre::eyre::{Context, Result, bail};
 use reqwest::Client;
-use rustix::path::Arg;
 use serde::Deserialize;
 
 use crate::metadata::{

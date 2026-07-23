@@ -65,6 +65,8 @@ pub enum Mode {
     LibraryPublish,
     LibrarySubscribe,
     LibraryBrowse,
+    LibraryManage,
+    Help,
 }
 
 pub const TABS_LABELS: [&str; 6] = ["All", "Book", "Article", "Thesis", "Report", "Misc"];
@@ -88,6 +90,7 @@ pub struct App {
     pub focus: Focus,
 
     pub library: LibraryState,
+    pub help_scroll: u16,
 
     task_channel_rx: UnboundedReceiver<Message>,
 }
@@ -102,7 +105,7 @@ impl App {
         let (task_channel_tx, task_channel_rx) = mpsc::unbounded_channel();
         let task_channel_tx = Arc::new(task_channel_tx);
         let import_dir = proj_dirs.data_dir().join("tomes");
-        std::fs::create_dir_all(&import_dir);
+        std::fs::create_dir_all(&import_dir)?;
         let archive = Arc::new(archive);
         let provider = MetadataProvider::new();
         let peers = PeerState::new(proj_dirs, task_channel_tx.clone()).await?;
@@ -130,11 +133,13 @@ impl App {
             peers,
             task_channel_rx,
             library,
+            help_scroll: 0,
         };
         app.request_refresh_item_list().await?;
         app.request_refresh_collections().await?;
         app.request_cover_for_selected();
         app.library.refresh().await?;
+        app.library.reopen_known_namespaces().await?;
         Ok(app)
     }
 
@@ -142,12 +147,10 @@ impl App {
     fn build_explorer(working_dir: Option<&PathBuf>) -> Result<FileExplorer> {
         let working_dir = match working_dir {
             Some(dir) => dir,
-            None => {
-                let Some(base_dirs) = directories::BaseDirs::new() else {
-                    bail!("Cannot get home directory")
-                };
-                &base_dirs.home_dir().to_path_buf()
-            }
+            None => match directories::BaseDirs::new() {
+                Some(base_dirs) => &base_dirs.home_dir().to_path_buf(),
+                None => bail!("Cannot get home directory"),
+            },
         };
         Ok(FileExplorerBuilder::default()
             .working_dir(working_dir)
@@ -664,7 +667,7 @@ impl App {
         &mut self,
         ticket_str: String,
         nickname: String,
-    ) -> color_eyre::Result<()> {
+    ) -> Result<()> {
         self.library.subscribe(ticket_str, nickname).await
     }
 
@@ -699,7 +702,7 @@ impl App {
         self.mode = Mode::LibraryPublish;
     }
 
-    pub async fn confirm_library_publish(&mut self) -> color_eyre::Result<()> {
+    pub async fn confirm_library_publish(&mut self) -> Result<()> {
         let Some(s) = &self.library.publish else {
             return Ok(());
         };
@@ -719,7 +722,7 @@ impl App {
         self.mode = Mode::LibraryBrowse;
     }
 
-    pub async fn confirm_library_subscribe(&mut self) -> color_eyre::Result<()> {
+    pub async fn confirm_library_subscribe(&mut self) -> Result<()> {
         let ok = self.library.confirm_subscribe().await?;
         if ok {
             self.mode = Mode::LibraryBrowse;
@@ -742,7 +745,73 @@ impl App {
         self.mode = Mode::Normal;
     }
 
-    pub async fn refresh_current_library(&mut self) -> color_eyre::Result<()> {
+    pub async fn refresh_current_library(&mut self) -> Result<()> {
         self.library.refresh_current().await
+    }
+
+    pub fn open_library_manage(&mut self) {
+        self.library.open_manage();
+        self.mode = Mode::LibraryManage;
+    }
+
+    pub fn copy_current_ticket_to_clipboard(&mut self) {
+        let Some(ticket) = self
+            .library
+            .manage
+            .as_ref()
+            .and_then(|s| s.current_ticket.clone())
+        else {
+            self.notify(
+                "No ticket generated",
+                " Copy ticket ".to_string(),
+                Level::Error,
+            );
+            return;
+        };
+        self.send_to_sys_clipboard(ticket);
+    }
+
+    pub fn open_help(&mut self) {
+        self.help_scroll = 0;
+        self.mode = Mode::Help;
+    }
+
+    pub async fn unsubscribe_selected_library(&mut self) -> color_eyre::Result<()> {
+        let Some(browse) = &self.library.browse else {
+            return Ok(());
+        };
+        if browse.focus != crate::tui::app::library::BrowseFocus::Subscriptions {
+            return Ok(());
+        }
+        let Some(i) = browse.subscription_list_state.selected() else {
+            return Ok(());
+        };
+        let Some(namespace_id) = self
+            .library
+            .subscriptions
+            .get(i)
+            .map(|s| s.namespace_id.clone())
+        else {
+            return Ok(());
+        };
+
+        self.library.unsubscribe(&namespace_id).await?;
+
+        if let Some(browse) = &mut self.library.browse {
+            let len = self.library.subscriptions.len();
+            browse.subscription_list_state.select(if len == 0 {
+                None
+            } else {
+                Some(i.min(len - 1))
+            });
+            browse.paper_list_state = ListState::default();
+        }
+
+        self.notify(
+            "Subscription removed",
+            " Shared libraries ".to_string(),
+            Level::Info,
+        );
+        Ok(())
     }
 }

@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use iroh::PublicKey;
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
@@ -7,7 +10,14 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph},
 };
 
-use crate::tui::app::{App, library::BrowseFocus};
+use crate::{
+    peer2peer::{NodeIdDisplay, PrettyDisplay},
+    schema::graphics::Spannable,
+    tui::{
+        app::{App, library::BrowseFocus},
+        ui::source_tag::SourceTag,
+    },
+};
 
 pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
     let center = f
@@ -187,7 +197,14 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
         .library
         .subscriptions
         .iter()
-        .map(|s| ListItem::new(s.nickname.clone()))
+        .map(|s| {
+            let pretty_owner = owner_pretty_name(&s.owner_node_id);
+            let owner_span = SourceTag(&pretty_owner).to_span();
+            ListItem::new(vec![
+                Line::from(s.nickname.clone().bold()),
+                Line::from(owner_span),
+            ])
+        })
         .collect();
     let subs_list = List::new(subs)
         .block(
@@ -215,9 +232,12 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
             } else {
                 p.authors.join(", ")
             };
+            let pretty_owner = NodeIdDisplay(p.owner).pretty_name();
+
             ListItem::new(vec![
                 Line::from(p.title.clone().bold()),
                 Line::from(authors.dim()),
+                Line::from(SourceTag(&pretty_owner).to_span()),
             ])
         })
         .collect();
@@ -252,4 +272,87 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
     };
     f.render_stateful_widget(subs_list, cols[0], &mut browse.subscription_list_state);
     f.render_stateful_widget(papers_list, cols[1], &mut browse.paper_list_state);
+}
+
+pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
+    let center = f
+        .area()
+        .centered(Constraint::Percentage(75), Constraint::Percentage(65));
+    f.render_widget(Clear, center);
+
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .split(center);
+
+    let items: Vec<ListItem> = app
+        .library
+        .shared_libraries
+        .iter()
+        .map(|l| ListItem::new(l.name.clone()))
+        .collect();
+
+    let Some(manage) = &mut app.library.manage else {
+        return;
+    };
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_set(border::THICK)
+                .border_style(Style::default().green())
+                .padding(Padding::uniform(1))
+                .title(" My Libraries ".bold().italic().yellow())
+                .title_bottom(
+                    Line::from(vec![
+                        " Ticket: ".yellow(),
+                        "<t> ".green(),
+                        " Delete: ".yellow(),
+                        "<d> ".green(),
+                        " Copy: ".yellow(),
+                        "<c> ".green(),
+                        " Close: ".yellow(),
+                        "<Esc> ".green(),
+                    ])
+                    .right_aligned(),
+                ),
+        )
+        .highlight_style(Style::default().green());
+    f.render_stateful_widget(list, cols[0], &mut manage.list_state);
+
+    let detail_block = Block::default()
+        .borders(Borders::ALL)
+        .border_set(border::THICK)
+        .border_style(Style::default().blue())
+        .padding(Padding::uniform(1))
+        .title(" Details ".bold().italic().yellow());
+    let inner = detail_block.inner(cols[1]);
+    f.render_widget(detail_block, cols[1]);
+
+    let mut lines = Vec::new();
+    if manage.generating {
+        lines.push(Line::from("Generating Ticket...".yellow()));
+    } else if let Some(ticket) = &manage.current_ticket {
+        lines.push(Line::from("Invite Ticket:".green().bold()));
+        lines.push(Line::raw(""));
+        lines.push(Line::from(ticket.clone()));
+    } else if let Some(err) = &manage.last_error {
+        lines.push(Line::from(format!("Error: {err}").red()));
+    } else {
+        lines.push(Line::from(
+            "Press <t> to generate the invite ticket for the library.".dim(),
+        ));
+    }
+    f.render_widget(
+        Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false }),
+        inner,
+    );
+}
+
+fn owner_pretty_name(owner_node_id: &str) -> String {
+    match PublicKey::from_str(owner_node_id) {
+        Ok(pk) => NodeIdDisplay(pk).pretty_name(),
+        Err(_) => owner_node_id.to_string(), // fallback: mostra il raw id
+    }
 }

@@ -1,12 +1,10 @@
-use std::{
-    collections::HashMap, os::unix::fs::MetadataExt, path::PathBuf, str::FromStr, sync::Arc,
-};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
 use chrono::Utc;
 use color_eyre::eyre::{Context, Result, bail, eyre};
 use crossterm::event::Event;
 use futures::StreamExt;
-use iroh_docs::{DocTicket, api::Doc, engine::LiveEvent};
+use iroh_docs::{DocTicket, NamespaceId, api::Doc, engine::LiveEvent};
 use ratatui::widgets::ListState;
 use tokio::sync::mpsc::UnboundedSender;
 use tui_input::{Input, backend::crossterm::EventHandler};
@@ -62,6 +60,13 @@ pub struct LibraryBrowseState {
     pub focus: BrowseFocus,
 }
 
+pub struct LibraryManageState {
+    pub list_state: ListState,
+    pub current_ticket: Option<String>,
+    pub generating: bool,
+    pub last_error: Option<String>,
+}
+
 pub struct LibraryState {
     archive: Arc<Archive>,
     share_node: Arc<ShareNode>,
@@ -71,6 +76,7 @@ pub struct LibraryState {
     pub browse: Option<LibraryBrowseState>,
     pub publish: Option<LibraryPublishState>,
     pub subscribe: Option<LibrarySubscribeState>,
+    pub manage: Option<LibraryManageState>,
 
     pub shared_libraries: Vec<SharedLibrary>,
     pub subscriptions: Vec<LibrarySubscription>,
@@ -97,6 +103,7 @@ impl LibraryState {
             browse: None,
             publish: None,
             subscribe: None,
+            manage: None,
         }
     }
 
@@ -129,7 +136,7 @@ impl LibraryState {
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
             let blob_size = match std::fs::metadata(&file_path) {
-                Ok(metadata) => metadata.size(),
+                Ok(metadata) => metadata.len(),
                 Err(_) => bail!("Cannot get metadata for {}", file_path.display()),
             };
 
@@ -555,5 +562,244 @@ impl LibraryState {
             return;
         };
         self.request_import(entry);
+    }
+
+    pub async fn reopen_known_namespaces(&mut self) -> color_eyre::Result<()> {
+        // NOTE: reopen published libraries, to keep them live
+        for library in self.shared_libraries.clone() {
+            let namespace_id = NamespaceId::from_str(&library.namespace_id).map_err(|e| {
+                eyre!(
+                    "Parsing stored namespace_id (published library): {}",
+                    e.to_string()
+                )
+            })?;
+            match self.share_node.docs.open(namespace_id).await {
+                Ok(Some(doc)) => {
+                    self.open_docs.insert(library.namespace_id.clone(), doc);
+                }
+                Ok(None) => tracing::warn!(
+                    namespace_id = %library.namespace_id,
+                    "Published library namespace not found in local docs store"
+                ),
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    namespace_id = %library.namespace_id,
+                    "Failed to reopen published library"
+                ),
+            }
+        }
+
+        // NOTE: reopen subscriptions
+        for subscription in self.subscriptions.clone() {
+            if let Err(e) = self.reopen_subscription(&subscription.namespace_id).await {
+                tracing::warn!(error = %e, namespace_id = %subscription.namespace_id, "Failed to reopen subscription");
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn reopen_subscription(&mut self, namespace_str: &str) -> color_eyre::Result<()> {
+        let namespace_id = NamespaceId::from_str(namespace_str).map_err(|e| {
+            eyre!(
+                "Parsing stored namespace_id (subscription): {}",
+                e.to_string()
+            )
+        })?;
+
+        let Some(doc) = self
+            .share_node
+            .docs
+            .open(namespace_id)
+            .await
+            .map_err(|e| eyre!("Reopening subscribed doc: {}", e.to_string()))?
+        else {
+            tracing::warn!(namespace_id = %namespace_str, "Subscribed namespace not found in local docs store");
+            return Ok(());
+        };
+
+        self.open_docs
+            .insert(namespace_str.to_string(), doc.clone());
+
+        match self.share_node.list_papers(&doc).await {
+            Ok(papers) => {
+                self.browsed_papers
+                    .insert(namespace_str.to_string(), papers);
+            }
+            Err(e) => tracing::warn!(error = %e, "Failed to list papers on reopen"),
+        }
+
+        let events = doc
+            .subscribe()
+            .await
+            .map_err(|e| eyre!("Subscribing to reopened doc events: {}", e.to_string()))?;
+        let share_node = self.share_node.clone();
+        let tx = self.tx.clone();
+        let namespace_for_task = namespace_str.to_string();
+        let doc_for_task = doc.clone();
+
+        tokio::spawn(async move {
+            tokio::pin!(events);
+            loop {
+                let event = match events.next().await {
+                    Some(Ok(event)) => event,
+                    Some(Err(e)) => {
+                        tracing::warn!(error = %e, "Error in doc event stream (reopened)");
+                        continue;
+                    }
+                    None => break,
+                };
+                let should_refresh = matches!(
+                    event,
+                    LiveEvent::SyncFinished(_) | LiveEvent::PendingContentReady
+                );
+                if should_refresh {
+                    match share_node.list_papers(&doc_for_task).await {
+                        Ok(papers) => {
+                            if tx
+                                .send(Message::LibraryPapersDiscovered {
+                                    namespace_id: namespace_for_task.clone(),
+                                    papers,
+                                })
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "Failed to list papers after sync event (reopened)")
+                        }
+                    }
+                }
+            }
+        });
+
+        Ok(())
+    }
+
+    pub async fn get_or_refresh_ticket(
+        &mut self,
+        namespace_id: &str,
+    ) -> color_eyre::Result<String> {
+        let doc = if let Some(doc) = self.open_docs.get(namespace_id) {
+            doc.clone()
+        } else {
+            let ns = NamespaceId::from_str(namespace_id)
+                .map_err(|e| eyre!("Parsing namespace_id: {}", e.to_string()))?;
+            let doc = self
+                .share_node
+                .docs
+                .open(ns)
+                .await
+                .map_err(|e| eyre!("Reopening doc for ticket generation: {}", e.to_string()))?
+                .ok_or_else(|| eyre!("Namespace not found locally"))?;
+            self.open_docs.insert(namespace_id.to_string(), doc.clone());
+            doc
+        };
+
+        let ticket = self.share_node.share_library(&doc).await?;
+        Ok(ticket.to_string())
+    }
+
+    pub async fn unpublish(&mut self, id: i32) -> color_eyre::Result<()> {
+        self.archive.delete_shared_library(id).await?;
+        self.shared_libraries.retain(|l| l.id != id);
+        Ok(())
+    }
+
+    pub fn open_manage(&mut self) {
+        let mut list_state = ListState::default();
+        if !self.shared_libraries.is_empty() {
+            list_state.select(Some(0));
+        }
+        self.manage = Some(LibraryManageState {
+            list_state,
+            current_ticket: None,
+            generating: false,
+            last_error: None,
+        });
+    }
+
+    pub fn close_manage(&mut self) {
+        self.manage = None;
+    }
+
+    pub fn manage_select_next(&mut self) {
+        let Some(s) = &mut self.manage else { return };
+        let len = self.shared_libraries.len();
+        if len == 0 {
+            return;
+        }
+        let i = match s.list_state.selected() {
+            Some(i) if i + 1 < len => i + 1,
+            _ => 0,
+        };
+        s.list_state.select(Some(i));
+        s.current_ticket = None;
+    }
+
+    pub fn manage_select_prev(&mut self) {
+        let Some(s) = &mut self.manage else { return };
+        let len = self.shared_libraries.len();
+        if len == 0 {
+            return;
+        }
+        let i = match s.list_state.selected() {
+            Some(i) if i > 0 => i - 1,
+            _ => len - 1,
+        };
+        s.list_state.select(Some(i));
+        s.current_ticket = None;
+    }
+
+    pub fn manage_selected(&self) -> Option<&SharedLibrary> {
+        let s = self.manage.as_ref()?;
+        let i = s.list_state.selected()?;
+        self.shared_libraries.get(i)
+    }
+
+    pub async fn manage_generate_ticket(&mut self) -> color_eyre::Result<()> {
+        let Some(namespace_id) = self.manage_selected().map(|l| l.namespace_id.clone()) else {
+            return Ok(());
+        };
+
+        if let Some(s) = &mut self.manage {
+            s.generating = true;
+        }
+
+        let result = self.get_or_refresh_ticket(&namespace_id).await;
+
+        if let Some(s) = &mut self.manage {
+            s.generating = false;
+            match result {
+                Ok(ticket) => s.current_ticket = Some(ticket),
+                Err(e) => s.last_error = Some(e.to_string()),
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn manage_delete_selected(&mut self) -> color_eyre::Result<()> {
+        let Some(id) = self.manage_selected().map(|l| l.id) else {
+            return Ok(());
+        };
+        self.unpublish(id).await?;
+        if let Some(s) = &mut self.manage {
+            s.list_state = ListState::default();
+            if !self.shared_libraries.is_empty() {
+                s.list_state.select(Some(0));
+            }
+            s.current_ticket = None;
+        }
+        Ok(())
+    }
+
+    pub async fn unsubscribe(&mut self, namespace_id: &str) -> color_eyre::Result<()> {
+        self.archive.delete_subscription(namespace_id).await?;
+        self.subscriptions
+            .retain(|s| s.namespace_id != namespace_id);
+        self.open_docs.remove(namespace_id);
+        self.browsed_papers.remove(namespace_id);
+        Ok(())
     }
 }

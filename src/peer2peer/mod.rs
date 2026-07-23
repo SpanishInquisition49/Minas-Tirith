@@ -131,3 +131,11 @@ pub trait PrettyDisplay {
         format!("{adjective} {noun} {epithet} [{suffix:03x}]")
     }
 }
+
+pub struct NodeIdDisplay(pub PublicKey);
+
+impl PrettyDisplay for NodeIdDisplay {
+    fn node_id(&self) -> PublicKey {
+        self.0
+    }
+}

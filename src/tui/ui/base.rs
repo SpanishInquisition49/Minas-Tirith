@@ -23,8 +23,10 @@ use crate::{
             },
             details::draw_details,
             form::draw_metadata_edit_popup,
+            help::draw_help_popup,
             library::{
-                draw_library_browse_popup, draw_library_publish_popup, draw_library_subscribe_popup,
+                draw_library_browse_popup, draw_library_manage_popup, draw_library_publish_popup,
+                draw_library_subscribe_popup,
             },
             metadata_select::draw_metadata_select_popup,
         },
@@ -78,6 +80,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Mode::LibraryPublish => draw_library_publish_popup(f, app),
         Mode::LibrarySubscribe => draw_library_subscribe_popup(f, app),
         Mode::LibraryBrowse => draw_library_browse_popup(f, app),
+        Mode::LibraryManage => draw_library_manage_popup(f, app),
+        Mode::Help => draw_help_popup(f, app),
     }
     app.notifications.render(f, f.area());
 }

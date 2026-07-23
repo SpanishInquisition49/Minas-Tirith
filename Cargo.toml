@@ -32,7 +32,7 @@ opener = "0.8.5"
 rand = "0.10.2"
 ratatui = "0.30.2"
 ratatui-explorer = "0.3.0"
-ratatui-image = { version = "11.0.6", features = [
+ratatui-image = { version = "11.0.6", default-features = false, features = [
     "crossterm",
     "tokio",
     "image-defaults",

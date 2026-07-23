@@ -30,7 +30,7 @@ impl Spannable for PeerInfo {
     }
 
     fn span_len(&self) -> usize {
-        self.node_id.to_string().len() + 2
+        self.pretty_name().len() + 2
     }
 }
 

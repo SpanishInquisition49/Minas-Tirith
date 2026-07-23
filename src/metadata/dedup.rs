@@ -1,6 +1,5 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use rustix::path::Arg;
 use slug::slugify;
 
 use crate::metadata::common_metadata::{ItemMetadata, ItemType};
