@@ -100,7 +100,7 @@ RETURNING *
             .bind(namespace_id)
             .execute(&self.pool)
             .await
-            .context("Updating subscription last_synced_at");
+            .context("Updating subscription last_synced_at")?;
         Ok(())
     }
 
@@ -109,7 +109,7 @@ RETURNING *
             .bind(namespace_id)
             .execute(&self.pool)
             .await
-            .context("Deleting library subscription");
+            .context("Deleting library subscription")?;
         Ok(())
     }
 }
