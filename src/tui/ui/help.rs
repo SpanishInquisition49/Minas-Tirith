@@ -60,10 +60,10 @@ pub fn draw_help_popup(f: &mut Frame, app: &mut App) {
         .sum();
 
     let max_scroll = total_wrapped_lines.saturating_sub(inner.height as usize) as u16;
-    app.help_scroll = app.help_scroll.min(max_scroll);
+    app.set_help_scroll(max_scroll);
 
     let paragraph = Paragraph::new(lines)
         .wrap(Wrap { trim: false })
-        .scroll((app.help_scroll, 0));
+        .scroll((app.get_help_scroll(), 0));
     f.render_widget(paragraph, inner);
 }

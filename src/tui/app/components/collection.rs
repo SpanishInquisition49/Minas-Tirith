@@ -11,6 +11,7 @@ use crate::{
     tui::app::traits::ListWidget,
 };
 
+#[derive(Clone, Copy, Debug)]
 pub enum AssignMode {
     /// Assign items to the selected collection
     Items,
@@ -19,11 +20,29 @@ pub enum AssignMode {
 }
 
 pub struct CollectionAssignState {
-    pub mode: AssignMode,
-    pub id: i32,
-    pub original: HashSet<i32>,
-    pub selected: HashSet<i32>,
-    pub list_state: ListState,
+    pub(in crate::tui::app) mode: AssignMode,
+    pub(in crate::tui::app) id: i32,
+    pub(in crate::tui::app) original: HashSet<i32>,
+    pub(in crate::tui::app) selected: HashSet<i32>,
+    pub(in crate::tui::app) list_state: ListState,
+}
+
+impl CollectionAssignState {
+    pub fn mode(&self) -> AssignMode {
+        self.mode
+    }
+
+    pub fn id(&self) -> i32 {
+        self.id
+    }
+
+    pub fn selected(&self) -> &HashSet<i32> {
+        &self.selected
+    }
+
+    pub fn list_state_mut(&mut self) -> &mut ListState {
+        &mut self.list_state
+    }
 }
 
 pub struct CollectionState {
@@ -38,10 +57,6 @@ pub struct CollectionState {
 impl ListWidget<Collection> for CollectionState {
     fn items(&self) -> &[Collection] {
         self.items.as_ref()
-    }
-
-    fn items_mut(&mut self) -> &mut Vec<Collection> {
-        self.items.as_mut()
     }
 
     fn list_state(&self) -> &ListState {

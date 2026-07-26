@@ -14,7 +14,10 @@ use crate::{
     peer2peer::{NodeIdDisplay, PrettyDisplay},
     schema::graphics::Spannable,
     tui::{
-        app::{App, library::BrowseFocus},
+        app::{
+            App,
+            components::library::{BrowseFocus, PublishField, SubscribeField},
+        },
         ui::source_tag::SourceTag,
     },
 };
@@ -25,11 +28,11 @@ pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
         .centered(Constraint::Percentage(60), Constraint::Length(25));
     f.render_widget(Clear, center);
 
-    let Some(s) = &app.library.publish else {
+    let Some(s) = app.get_publish_state() else {
         return;
     };
 
-    let title = if s.publishing {
+    let title = if s.is_publishing() {
         " Publishing... "
     } else {
         " Published as Library "
@@ -65,11 +68,11 @@ pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
         .split(inner);
 
     f.render_widget(
-        Paragraph::new(format!("Collection: {}", s.collection_name)).dim(),
+        Paragraph::new(format!("Collection: {}", s.collection_name())).dim(),
         rows[0],
     );
 
-    if let Some(ticket) = &s.result_ticket {
+    if let Some(ticket) = &s.result_ticket() {
         let msg = Paragraph::new(vec![
             Line::from("Published! Invite Ticket:".green()),
             Line::from(ticket.clone()),
@@ -78,24 +81,24 @@ pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
         return;
     }
 
-    let name_style = if s.field == super::super::app::library::PublishField::Name {
+    let name_style = if s.publish_field() == PublishField::Name {
         Style::default().green()
     } else {
         Style::default().yellow()
     };
-    let desc_style = if s.field == super::super::app::library::PublishField::Description {
+    let desc_style = if s.publish_field() == PublishField::Description {
         Style::default().green()
     } else {
         Style::default().yellow()
     };
 
     f.render_widget(
-        Paragraph::new(s.name_input.value())
+        Paragraph::new(s.collection_name_input().value())
             .block(Block::bordered().title(" Name ").border_style(name_style)),
         rows[1],
     );
     f.render_widget(
-        Paragraph::new(s.description_input.value()).block(
+        Paragraph::new(s.collection_description_input().value()).block(
             Block::bordered()
                 .title(" Description ")
                 .border_style(desc_style),
@@ -103,7 +106,7 @@ pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
         rows[2],
     );
 
-    if let Some(err) = &s.last_error {
+    if let Some(err) = s.get_last_error() {
         f.render_widget(Paragraph::new(format!("Error: {err}")).red(), rows[2]);
     }
 }
@@ -114,7 +117,7 @@ pub fn draw_library_subscribe_popup(f: &mut Frame, app: &mut App) {
         .centered(Constraint::Percentage(60), Constraint::Length(25));
     f.render_widget(Clear, center);
 
-    let Some(s) = &app.library.subscribe else {
+    let Some(s) = app.get_subscribe_state() else {
         return;
     };
 
@@ -143,20 +146,19 @@ pub fn draw_library_subscribe_popup(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Length(3), Constraint::Length(25)])
         .split(inner);
 
-    use crate::tui::app::library::SubscribeField;
-    let ticket_style = if s.field == SubscribeField::Ticket {
+    let ticket_style = if s.field() == SubscribeField::Ticket {
         Style::default().green()
     } else {
         Style::default().yellow()
     };
-    let nick_style = if s.field == SubscribeField::Nickname {
+    let nick_style = if s.field() == SubscribeField::Nickname {
         Style::default().green()
     } else {
         Style::default().yellow()
     };
 
     f.render_widget(
-        Paragraph::new(s.ticket_input.value()).block(
+        Paragraph::new(s.ticket_input().value()).block(
             Block::bordered()
                 .title(" Ticket ")
                 .border_style(ticket_style),
@@ -164,7 +166,7 @@ pub fn draw_library_subscribe_popup(f: &mut Frame, app: &mut App) {
         rows[0],
     );
     f.render_widget(
-        Paragraph::new(s.nickname_input.value()).block(
+        Paragraph::new(s.nickname_input().value()).block(
             Block::bordered()
                 .title(" Nickname ")
                 .border_style(nick_style),
@@ -172,7 +174,7 @@ pub fn draw_library_subscribe_popup(f: &mut Frame, app: &mut App) {
         rows[1],
     );
 
-    if let Some(err) = &s.last_error {
+    if let Some(err) = s.get_last_error() {
         f.render_widget(Paragraph::new(format!("Error: {err}")).red(), rows[1]);
     }
 }
@@ -188,14 +190,13 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
         .split(center);
 
-    let Some(browse) = &app.library.browse else {
+    let Some(browse) = app.get_library_browse_state() else {
         return;
     };
 
-    let sub_focused = browse.focus == BrowseFocus::Subscriptions;
+    let sub_focused = browse.focus() == BrowseFocus::Subscriptions;
     let subs: Vec<ListItem> = app
-        .library
-        .subscriptions
+        .get_subscriptions()
         .iter()
         .map(|s| {
             let pretty_owner = owner_pretty_name(&s.owner_node_id);
@@ -223,8 +224,7 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
         .highlight_style(Style::default().green());
 
     let papers: Vec<ListItem> = app
-        .library
-        .current_papers()
+        .current_library_items()
         .iter()
         .map(|p| {
             let authors = if p.authors.is_empty() {
@@ -241,7 +241,7 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
             ])
         })
         .collect();
-    let papers_focused = browse.focus == BrowseFocus::Papers;
+    let papers_focused = browse.focus() == BrowseFocus::Papers;
     let papers_list = List::new(papers)
         .block(
             Block::default()
@@ -267,11 +267,11 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
                 ),
         )
         .highlight_style(Style::default().green());
-    let Some(browse) = &mut app.library.browse else {
+    let Some(browse) = app.get_library_browse_state_mut() else {
         return;
     };
-    f.render_stateful_widget(subs_list, cols[0], &mut browse.subscription_list_state);
-    f.render_stateful_widget(papers_list, cols[1], &mut browse.paper_list_state);
+    f.render_stateful_widget(subs_list, cols[0], browse.subscription_list_state_mut());
+    f.render_stateful_widget(papers_list, cols[1], browse.item_list_state_mut());
 }
 
 pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
@@ -286,13 +286,12 @@ pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
         .split(center);
 
     let items: Vec<ListItem> = app
-        .library
-        .shared_libraries
+        .get_shared_libraries()
         .iter()
         .map(|l| ListItem::new(l.name.clone()))
         .collect();
 
-    let Some(manage) = &mut app.library.manage else {
+    let Some(manage) = app.get_library_manage_state_mut() else {
         return;
     };
 
@@ -319,7 +318,7 @@ pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
                 ),
         )
         .highlight_style(Style::default().green());
-    f.render_stateful_widget(list, cols[0], &mut manage.list_state);
+    f.render_stateful_widget(list, cols[0], manage.list_state_mut());
 
     let detail_block = Block::default()
         .borders(Borders::ALL)
@@ -331,13 +330,13 @@ pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
     f.render_widget(detail_block, cols[1]);
 
     let mut lines = Vec::new();
-    if manage.generating {
+    if manage.is_generating() {
         lines.push(Line::from("Generating Ticket...".yellow()));
-    } else if let Some(ticket) = &manage.current_ticket {
+    } else if let Some(ticket) = manage.current_ticket() {
         lines.push(Line::from("Invite Ticket:".green().bold()));
         lines.push(Line::raw(""));
         lines.push(Line::from(ticket.clone()));
-    } else if let Some(err) = &manage.last_error {
+    } else if let Some(err) = manage.get_last_error() {
         lines.push(Line::from(format!("Error: {err}").red()));
     } else {
         lines.push(Line::from(

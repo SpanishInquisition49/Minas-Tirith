@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use color_eyre::eyre::Result;
 use directories::ProjectDirs;
@@ -14,19 +14,10 @@ use crate::{
     tui::app::traits::ListWidget,
 };
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct ShareRequest {
-    pub peer: PeerInfo,
-    pub item: bool,
-}
-
 pub struct PeerState {
     peers: Vec<PeerInfo>,
     pub share_node: Arc<ShareNode>,
     list_state: ListState,
-    ignored: HashSet<PeerInfo>,
-    pending_requests: HashSet<ShareRequest>,
-    incoming_requests: HashSet<ShareRequest>,
 }
 
 impl PeerState {
@@ -37,25 +28,7 @@ impl PeerState {
             peers: Vec::new(),
             share_node,
             list_state: ListState::default(),
-            ignored: HashSet::new(),
-            pending_requests: HashSet::new(),
-            incoming_requests: HashSet::new(),
         })
-    }
-
-    pub fn request_share_item(&mut self) {
-        let Some(index) = self.list_state.selected() else {
-            return;
-        };
-
-        let Some(peer) = self.peers.get(index) else {
-            return;
-        };
-
-        self.pending_requests.insert(ShareRequest {
-            peer: peer.clone(),
-            item: true,
-        });
     }
 
     pub fn on_peer_discover(&mut self, peer_info: PeerInfo) {
@@ -75,10 +48,6 @@ impl PeerState {
 impl ListWidget<PeerInfo> for PeerState {
     fn items(&self) -> &[PeerInfo] {
         &self.peers
-    }
-
-    fn items_mut(&mut self) -> &mut Vec<PeerInfo> {
-        self.peers.as_mut()
     }
 
     fn list_state(&self) -> &ListState {

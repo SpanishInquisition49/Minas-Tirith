@@ -20,15 +20,13 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         .centered(Constraint::Percentage(80), Constraint::Percentage(80));
     f.render_widget(Clear, center);
 
-    let Some(form) = &mut app.metadata.form else {
-        return;
-    };
-
-    let title = if app.metadata.saving {
-        let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-        let frame = spinner[app.tick_counter % spinner.len()];
-        app.tick_counter += 1;
-        Line::from(format!(" {frame} Saving... ").bold().italic().yellow())
+    let title = if app.is_saving_metadata() {
+        Line::from(
+            format!(" {} Saving... ", app.tick())
+                .bold()
+                .italic()
+                .yellow(),
+        )
     } else {
         Line::from(" Edit metadata ".bold().italic().yellow())
     };
@@ -73,12 +71,16 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
     f.render_widget(block, center);
 
     let mut lines: Vec<Line> = Vec::new();
-    if let Some(err) = &app.metadata.last_error {
+    if let Some(err) = app.get_metadata_last_error() {
         lines.push(Line::from(Span::styled(
             format!("Error: {err}"),
             Style::default().red(),
         )));
     }
+
+    let Some(form) = app.get_metadata_form_mut() else {
+        return;
+    };
     lines.push(Line::from(vec![
         "Type: ".bold(),
         form.item_type.to_string().into(),

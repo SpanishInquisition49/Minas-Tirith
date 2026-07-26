@@ -47,7 +47,10 @@ impl CoverState {
 
     /// Kicks off a download or generation task if not already in cache or pin flight
     pub fn request(&mut self, id: i32, cover_url: Option<String>, file_path: String) {
-        if self.covers.contains_key(&id) || self.pending.contains(&id) {
+        if self.covers.contains_key(&id)
+            || self.pending.contains(&id)
+            || self.too_many_failures(&id)
+        {
             return;
         }
 
@@ -57,9 +60,17 @@ impl CoverState {
         }
     }
 
+    /// Don't kicks off another request if too many have failed before
+    fn too_many_failures(&self, item_id: &i32) -> bool {
+        match self.failed.get(item_id) {
+            Some(f) => *f < 5,
+            None => false,
+        }
+    }
+
     /// Applies an inbound 'ItemCover' message: stores the decoded protocol
     /// and, for the generated covers, persist the URL on the item
-    pub fn handle_message(&mut self, data: CoverImageData, items: &mut [DatabaseItem]) {
+    pub fn handle_ready(&mut self, data: CoverImageData, items: &mut [DatabaseItem]) {
         self.pending.remove(&data.item_id);
         self.covers.insert(data.item_id, data.protocol);
         if let Some(url) = data.url
@@ -67,6 +78,14 @@ impl CoverState {
         {
             item.fields.cover_image_url = Some(url);
         }
+    }
+
+    pub fn handle_failed(&mut self, item_id: i32) {
+        self.pending.remove(&item_id);
+        match self.failed.get(&item_id) {
+            Some(f) => self.failed.insert(item_id, f + 1),
+            None => self.failed.insert(item_id, 0),
+        };
     }
 
     pub fn get_mut(&mut self, item_id: i32) -> Option<&mut StatefulProtocol> {

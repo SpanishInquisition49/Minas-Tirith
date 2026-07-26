@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
 use chrono::Utc;
 use color_eyre::eyre::{Context, Result, bail, eyre};
@@ -13,58 +13,141 @@ use uuid::Uuid;
 use crate::{
     database::archive::Archive,
     metadata::shared_library::{LibrarySubscription, SharedLibrary},
-    peer2peer::{PrettyDisplay, library::SharedPaperEntry, node::ShareNode},
-    schema::{item::DatabaseItem, message::Message},
+    peer2peer::{PrettyDisplay, library::SharedItemEntry, node::ShareNode},
+    schema::{
+        item::DatabaseItem,
+        message::{LibraryDownloadFailed, LibraryDownloadReady, LibraryItemsDiscovered, Message},
+    },
 };
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum PublishField {
     Name,
     Description,
 }
 
 pub struct LibraryPublishState {
-    pub collection_id: i32,
-    pub collection_name: String,
-    pub name_input: Input,
-    pub description_input: Input,
-    pub field: PublishField,
-    pub publishing: bool,
-    pub result_ticket: Option<String>,
-    pub last_error: Option<String>,
+    pub(in crate::tui::app) collection_id: i32,
+    pub(in crate::tui::app) collection_name: String,
+    pub(in crate::tui::app) name_input: Input,
+    pub(in crate::tui::app) description_input: Input,
+    pub(in crate::tui::app) field: PublishField,
+    pub(in crate::tui::app) publishing: bool,
+    pub(in crate::tui::app) result_ticket: Option<String>,
+    pub(in crate::tui::app) last_error: Option<String>,
 }
 
-#[derive(PartialEq, Eq)]
+impl LibraryPublishState {
+    pub fn collection_name(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.collection_name)
+    }
+
+    pub fn collection_name_input(&self) -> &Input {
+        &self.name_input
+    }
+
+    pub fn collection_description_input(&self) -> &Input {
+        &self.description_input
+    }
+
+    pub fn publish_field(&self) -> PublishField {
+        self.field
+    }
+
+    pub fn is_publishing(&self) -> bool {
+        self.publishing
+    }
+
+    pub fn result_ticket(&self) -> Option<Cow<'_, str>> {
+        self.result_ticket.as_deref().map(Cow::Borrowed)
+    }
+
+    pub fn get_last_error(&self) -> Option<Cow<'_, str>> {
+        self.last_error.as_deref().map(Cow::Borrowed)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum SubscribeField {
     Ticket,
     Nickname,
 }
 
 pub struct LibrarySubscribeState {
-    pub ticket_input: Input,
-    pub nickname_input: Input,
-    pub field: SubscribeField,
-    pub subscribing: bool,
-    pub last_error: Option<String>,
+    pub(in crate::tui::app) ticket_input: Input,
+    pub(in crate::tui::app) nickname_input: Input,
+    pub(in crate::tui::app) field: SubscribeField,
+    pub(in crate::tui::app) subscribing: bool,
+    pub(in crate::tui::app) last_error: Option<String>,
 }
 
-#[derive(PartialEq, Eq)]
+impl LibrarySubscribeState {
+    pub fn ticket_input(&self) -> &Input {
+        &self.ticket_input
+    }
+
+    pub fn nickname_input(&self) -> &Input {
+        &self.nickname_input
+    }
+
+    pub fn field(&self) -> SubscribeField {
+        self.field
+    }
+
+    pub fn get_last_error(&self) -> Option<Cow<'_, str>> {
+        self.last_error.as_deref().map(Cow::Borrowed)
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum BrowseFocus {
     Subscriptions,
     Papers,
 }
 
 pub struct LibraryBrowseState {
-    pub subscription_list_state: ListState,
-    pub paper_list_state: ListState,
-    pub focus: BrowseFocus,
+    pub(in crate::tui::app) subscription_list_state: ListState,
+    pub(in crate::tui::app) item_list_state: ListState,
+    pub(in crate::tui::app) focus: BrowseFocus,
+}
+
+impl LibraryBrowseState {
+    pub fn subscription_list_state_mut(&mut self) -> &mut ListState {
+        &mut self.subscription_list_state
+    }
+
+    pub fn item_list_state_mut(&mut self) -> &mut ListState {
+        &mut self.item_list_state
+    }
+
+    pub fn focus(&self) -> BrowseFocus {
+        self.focus
+    }
 }
 
 pub struct LibraryManageState {
-    pub list_state: ListState,
-    pub current_ticket: Option<String>,
-    pub generating: bool,
-    pub last_error: Option<String>,
+    pub(in crate::tui::app) list_state: ListState,
+    pub(in crate::tui::app) current_ticket: Option<String>,
+    pub(in crate::tui::app) generating: bool,
+    pub(in crate::tui::app) last_error: Option<String>,
+}
+
+impl LibraryManageState {
+    pub fn list_state_mut(&mut self) -> &mut ListState {
+        &mut self.list_state
+    }
+
+    pub fn current_ticket(&self) -> Option<Cow<'_, str>> {
+        self.current_ticket.as_deref().map(Cow::Borrowed)
+    }
+
+    pub fn is_generating(&self) -> bool {
+        self.generating
+    }
+
+    pub fn get_last_error(&self) -> Option<Cow<'_, str>> {
+        self.last_error.as_deref().map(Cow::Borrowed)
+    }
 }
 
 pub struct LibraryState {
@@ -73,14 +156,13 @@ pub struct LibraryState {
     tx: Arc<UnboundedSender<Message>>,
     import_dir: PathBuf,
 
-    pub browse: Option<LibraryBrowseState>,
-    pub publish: Option<LibraryPublishState>,
-    pub subscribe: Option<LibrarySubscribeState>,
-    pub manage: Option<LibraryManageState>,
-
-    pub shared_libraries: Vec<SharedLibrary>,
-    pub subscriptions: Vec<LibrarySubscription>,
-    pub browsed_papers: HashMap<String, Vec<SharedPaperEntry>>,
+    pub(in crate::tui::app) browse: Option<LibraryBrowseState>,
+    pub(in crate::tui::app) publish: Option<LibraryPublishState>,
+    pub(in crate::tui::app) subscribe: Option<LibrarySubscribeState>,
+    pub(in crate::tui::app) manage: Option<LibraryManageState>,
+    pub(in crate::tui::app) shared_libraries: Vec<SharedLibrary>,
+    pub(in crate::tui::app) subscriptions: Vec<LibrarySubscription>,
+    pub(in crate::tui::app) browsed_papers: HashMap<String, Vec<SharedItemEntry>>,
     open_docs: HashMap<String, Doc>,
 }
 
@@ -140,7 +222,7 @@ impl LibraryState {
                 Err(_) => bail!("Cannot get metadata for {}", file_path.display()),
             };
 
-            let entry = SharedPaperEntry {
+            let entry = SharedItemEntry {
                 paper_id: Uuid::new_v4(),
                 blob_hash: tag.hash(),
                 blob_size,
@@ -216,11 +298,13 @@ impl LibraryState {
 
                 if should_refresh {
                     match share_node.list_papers(&doc_for_task).await {
-                        Ok(papers) => {
-                            if let Err(e) = tx.send(Message::LibraryPapersDiscovered {
-                                namespace_id: namespace_for_task.clone(),
-                                papers,
-                            }) {
+                        Ok(items) => {
+                            if let Err(e) = tx.send(Message::LibraryItemsDiscovered(Box::new(
+                                LibraryItemsDiscovered {
+                                    namespace_id: namespace_for_task.clone(),
+                                    items,
+                                },
+                            ))) {
                                 tracing::error!(error = %e, "Failed to send discovered papers");
                                 break;
                             }
@@ -236,15 +320,11 @@ impl LibraryState {
         Ok(())
     }
 
-    pub fn handle_papers_discovered(
-        &mut self,
-        namespace_id: String,
-        papers: Vec<SharedPaperEntry>,
-    ) {
+    pub fn handle_items_discovered(&mut self, namespace_id: String, papers: Vec<SharedItemEntry>) {
         self.browsed_papers.insert(namespace_id, papers);
     }
 
-    pub fn request_import(&mut self, entry: SharedPaperEntry) {
+    pub fn request_import(&mut self, entry: SharedItemEntry) {
         let share_node = self.share_node.clone();
         let tx = self.tx.clone();
         let dest_dir = self.import_dir.clone();
@@ -257,18 +337,22 @@ impl LibraryState {
                 .await
             {
                 Ok(local_path) => {
-                    if let Err(e) = tx.send(Message::PaperDownloadReady {
-                        entry: entry_for_task,
-                        local_path,
-                    }) {
+                    if let Err(e) =
+                        tx.send(Message::ItemDownloadReady(Box::new(LibraryDownloadReady {
+                            entry: entry_for_task,
+                            local_path,
+                        })))
+                    {
                         tracing::error!(error = %e, "Failed to send paper download ready");
                     }
                 }
                 Err(e) => {
-                    let _ = tx.send(Message::PaperDownloadFailed {
-                        paper_id: entry_for_task.paper_id,
-                        reason: e.to_string(),
-                    });
+                    let _ = tx.send(Message::ItemDownloadFailed(Box::new(
+                        LibraryDownloadFailed {
+                            item_id: entry_for_task.paper_id,
+                            reason: e.to_string(),
+                        },
+                    )));
                 }
             }
         });
@@ -449,7 +533,7 @@ impl LibraryState {
         }
         self.browse = Some(LibraryBrowseState {
             subscription_list_state,
-            paper_list_state: ListState::default(),
+            item_list_state: ListState::default(),
             focus: BrowseFocus::Subscriptions,
         });
     }
@@ -475,7 +559,7 @@ impl LibraryState {
             .map(|sub| sub.namespace_id.as_str())
     }
 
-    pub fn current_papers(&self) -> &[SharedPaperEntry] {
+    pub fn current_items(&self) -> &[SharedItemEntry] {
         self.current_namespace()
             .and_then(|ns| self.browsed_papers.get(ns))
             .map(Vec::as_slice)
@@ -487,7 +571,7 @@ impl LibraryState {
 
         let len = match s.focus {
             BrowseFocus::Subscriptions => self.subscriptions.len(),
-            BrowseFocus::Papers => self.current_papers().len(),
+            BrowseFocus::Papers => self.current_items().len(),
         };
 
         let Some(s) = &mut self.browse else { return };
@@ -501,10 +585,10 @@ impl LibraryState {
                     _ => 0,
                 };
                 s.subscription_list_state.select(Some(i));
-                s.paper_list_state = ListState::default();
+                s.item_list_state = ListState::default();
             }
             BrowseFocus::Papers => {
-                let index = s.paper_list_state.selected();
+                let index = s.item_list_state.selected();
                 if len == 0 {
                     return;
                 }
@@ -512,7 +596,7 @@ impl LibraryState {
                     Some(i) if i + 1 < len => i + 1,
                     _ => 0,
                 };
-                s.paper_list_state.select(Some(i));
+                s.item_list_state.select(Some(i));
             }
         }
     }
@@ -522,7 +606,7 @@ impl LibraryState {
 
         let len = match s.focus {
             BrowseFocus::Subscriptions => self.subscriptions.len(),
-            BrowseFocus::Papers => self.current_papers().len(),
+            BrowseFocus::Papers => self.current_items().len(),
         };
         let Some(s) = &mut self.browse else { return };
         match s.focus {
@@ -535,17 +619,17 @@ impl LibraryState {
                     _ => len - 1,
                 };
                 s.subscription_list_state.select(Some(i));
-                s.paper_list_state = ListState::default();
+                s.item_list_state = ListState::default();
             }
             BrowseFocus::Papers => {
                 if len == 0 {
                     return;
                 }
-                let i = match s.paper_list_state.selected() {
+                let i = match s.item_list_state.selected() {
                     Some(i) if i > 0 => i - 1,
                     _ => len - 1,
                 };
-                s.paper_list_state.select(Some(i));
+                s.item_list_state.select(Some(i));
             }
         }
     }
@@ -555,10 +639,10 @@ impl LibraryState {
         if s.focus != BrowseFocus::Papers {
             return;
         }
-        let Some(i) = s.paper_list_state.selected() else {
+        let Some(i) = s.item_list_state.selected() else {
             return;
         };
-        let Some(entry) = self.current_papers().get(i).cloned() else {
+        let Some(entry) = self.current_items().get(i).cloned() else {
             return;
         };
         self.request_import(entry);
@@ -655,12 +739,14 @@ impl LibraryState {
                 );
                 if should_refresh {
                     match share_node.list_papers(&doc_for_task).await {
-                        Ok(papers) => {
+                        Ok(items) => {
                             if tx
-                                .send(Message::LibraryPapersDiscovered {
-                                    namespace_id: namespace_for_task.clone(),
-                                    papers,
-                                })
+                                .send(Message::LibraryItemsDiscovered(Box::new(
+                                    LibraryItemsDiscovered {
+                                        namespace_id: namespace_for_task.clone(),
+                                        items,
+                                    },
+                                )))
                                 .is_err()
                             {
                                 break;

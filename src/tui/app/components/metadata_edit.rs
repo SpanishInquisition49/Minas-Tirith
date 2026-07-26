@@ -5,7 +5,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     database::archive::Archive,
-    metadata::{common_metadata::ItemMetadata, dedup::MergedCandidate, facade::MetadataProvider},
+    metadata::{dedup::MergedCandidate, facade::MetadataProvider},
     schema::{
         form::MetadataForm,
         message::{AbstractData, Message, SaveOutcome},
@@ -39,10 +39,6 @@ pub struct MetadataEditState {
 impl ListWidget<MergedCandidate> for MetadataEditState {
     fn items(&self) -> &[MergedCandidate] {
         &self.candidates
-    }
-
-    fn items_mut(&mut self) -> &mut Vec<MergedCandidate> {
-        &mut self.candidates
     }
 
     fn list_state(&self) -> &ListState {

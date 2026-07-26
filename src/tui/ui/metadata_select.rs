@@ -19,8 +19,7 @@ pub fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
     f.render_widget(Clear, center);
 
     let items: Vec<ListItem> = app
-        .metadata
-        .candidates
+        .get_metadata_candidates()
         .iter()
         .map(|c| {
             let authors = if c.authors.is_empty() {
@@ -67,5 +66,5 @@ pub fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
         )
         .highlight_style(Style::default().green());
 
-    f.render_stateful_widget(list, center, &mut app.metadata.list_state);
+    f.render_stateful_widget(list, center, app.get_metadata_list_state_mut());
 }

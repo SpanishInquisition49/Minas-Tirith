@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     metadata::dedup::MergedCandidate,
-    peer2peer::{discovery::PeerInfo, library::SharedPaperEntry},
+    peer2peer::{discovery::PeerInfo, library::SharedItemEntry},
 };
 
 #[derive(Debug)]
@@ -26,23 +26,30 @@ pub struct AbstractData {
     pub success: bool,
 }
 
+pub struct LibraryItemsDiscovered {
+    pub namespace_id: String,
+    pub items: Vec<SharedItemEntry>,
+}
+
+pub struct LibraryDownloadReady {
+    pub entry: SharedItemEntry,
+    pub local_path: PathBuf,
+}
+
+pub struct LibraryDownloadFailed {
+    pub item_id: Uuid,
+    pub reason: String,
+}
+
 pub enum Message {
     Save(SaveOutcome),
     Metadata(Vec<MergedCandidate>),
     ImageCover(Box<CoverImageData>),
+    ImageCoverFailed { item_id: i32 },
     Abstract(AbstractData),
     PeerDiscovered(PeerInfo),
     PeerExpired(PeerInfo),
-    LibraryPapersDiscovered {
-        namespace_id: String,
-        papers: Vec<SharedPaperEntry>,
-    },
-    PaperDownloadReady {
-        entry: SharedPaperEntry,
-        local_path: PathBuf,
-    },
-    PaperDownloadFailed {
-        paper_id: Uuid,
-        reason: String,
-    },
+    LibraryItemsDiscovered(Box<LibraryItemsDiscovered>),
+    ItemDownloadReady(Box<LibraryDownloadReady>),
+    ItemDownloadFailed(Box<LibraryDownloadFailed>),
 }

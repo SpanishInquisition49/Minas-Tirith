@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SharedPaperEntry {
+pub struct SharedItemEntry {
     pub paper_id: Uuid,
     pub blob_hash: Hash,
     pub blob_size: u64,
@@ -65,7 +65,7 @@ impl ShareNode {
         &self,
         doc: &Doc,
         author: AuthorId,
-        entry: &SharedPaperEntry,
+        entry: &SharedItemEntry,
     ) -> Result<()> {
         let key = entry.paper_id.as_bytes().to_vec();
         let value = serde_json::to_vec(entry).context("Serializing SharedPaperEntry")?;
@@ -75,7 +75,7 @@ impl ShareNode {
         Ok(())
     }
 
-    pub async fn list_papers(&self, doc: &Doc) -> Result<Vec<SharedPaperEntry>> {
+    pub async fn list_papers(&self, doc: &Doc) -> Result<Vec<SharedItemEntry>> {
         let stream = doc
             .get_many(Query::single_latest_per_key())
             .await
@@ -92,7 +92,7 @@ impl ShareNode {
                 .get_bytes(entry.content_hash())
                 .await
                 .context("Fetching entry contenct bytes")?;
-            let parsed: SharedPaperEntry =
+            let parsed: SharedItemEntry =
                 serde_json::from_slice(&bytes).context("Deserializing SharedPaperEntry")?;
             out.push(parsed);
         }
@@ -119,7 +119,7 @@ impl ShareNode {
     }
 }
 
-impl ItemMetadata for SharedPaperEntry {
+impl ItemMetadata for SharedItemEntry {
     fn title(&self) -> Cow<'_, str> {
         Cow::Borrowed(&self.title)
     }

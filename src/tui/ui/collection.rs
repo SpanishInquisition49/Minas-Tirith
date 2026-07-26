@@ -9,11 +9,11 @@ use ratatui::{
 
 use crate::{
     schema::collection::Collection,
-    tui::app::{App, Focus, collection::AssignMode},
+    tui::app::{App, Focus, components::collection::AssignMode},
 };
 
 pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
-    let focused = matches!(app.focus, Focus::Collections);
+    let focused = matches!(app.focus(), Focus::Collections);
     let border_style = if focused {
         Style::default().green()
     } else {
@@ -21,8 +21,7 @@ pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     };
 
     let items: Vec<ListItem> = app
-        .collections
-        .items
+        .collections()
         .iter()
         .map(|c| ListItem::new(c.name.clone()))
         .collect();
@@ -49,7 +48,7 @@ pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
         )
         .highlight_style(Style::default().green());
 
-    f.render_stateful_widget(list, area, &mut app.collections.list_state);
+    f.render_stateful_widget(list, area, app.collection_list_state_mut());
 }
 
 pub fn draw_collection_create_popup(f: &mut Frame, app: &mut App) {
@@ -57,7 +56,7 @@ pub fn draw_collection_create_popup(f: &mut Frame, app: &mut App) {
         .area()
         .centered(Constraint::Percentage(40), Constraint::Length(3));
     f.render_widget(Clear, center);
-    let input = Paragraph::new(app.collections.name_input.value()).block(
+    let input = Paragraph::new(app.collection_input_field().value()).block(
         Block::bordered()
             .border_set(border::THICK)
             .border_style(Style::default().blue())
@@ -69,7 +68,7 @@ pub fn draw_collection_create_popup(f: &mut Frame, app: &mut App) {
             ),
     );
     f.render_widget(input, center);
-    let x = app.collections.name_input.visual_cursor() as u16 + 1;
+    let x = app.collection_input_field().visual_cursor() as u16 + 1;
     f.set_cursor_position((center.x + x, center.y + 1));
 }
 
@@ -79,17 +78,17 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
         .centered(Constraint::Percentage(50), Constraint::Percentage(50));
     f.render_widget(Clear, center);
 
-    let Some(state) = &mut app.collections.assign else {
+    let Some(state) = app.collection_assign_state() else {
         return;
     };
 
-    let (items, title) = match state.mode {
+    let (items, title) = match state.mode() {
         AssignMode::Items => {
             let items = app
-                .items
+                .items()
                 .iter()
                 .map(|i| {
-                    let mark = if state.selected.contains(&i.id) {
+                    let mark = if state.selected().contains(&i.id) {
                         "[x]"
                     } else {
                         "[ ]"
@@ -97,8 +96,8 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
                     ListItem::new(format!("{mark} {}", i.fields.title))
                 })
                 .collect::<Vec<_>>();
-            let collection_name = app.collections.items.iter().find_map(|c| {
-                if c.id == state.id {
+            let collection_name = app.collections().iter().find_map(|c| {
+                if c.id == state.id() {
                     Some(c.name.as_str())
                 } else {
                     None
@@ -111,13 +110,12 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
         }
         AssignMode::Collections => {
             let items = app
-                .collections
-                .items
+                .collections()
                 .iter()
                 // NOTE: exclude the trivial collection "All"
                 .filter(|c| !Collection::is_trivial_collection(c.id))
                 .map(|c| {
-                    let mark = if state.selected.contains(&c.id) {
+                    let mark = if state.selected().contains(&c.id) {
                         "[x]"
                     } else {
                         "[ ]"
@@ -125,8 +123,8 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
                     ListItem::new(format!("{mark} {}", c.name))
                 })
                 .collect::<Vec<_>>();
-            let item_title = app.items.iter().find_map(|i| {
-                if i.id == state.id {
+            let item_title = app.items().iter().find_map(|i| {
+                if i.id == state.id() {
                     Some(i.fields.title.as_str())
                 } else {
                     None
@@ -164,5 +162,8 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
         )
         .highlight_style(Style::default().green());
 
-    f.render_stateful_widget(list, center, &mut state.list_state);
+    let Some(state) = app.collection_assign_state_mut() else {
+        return;
+    };
+    f.render_stateful_widget(list, center, state.list_state_mut());
 }

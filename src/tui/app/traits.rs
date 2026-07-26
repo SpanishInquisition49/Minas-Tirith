@@ -2,7 +2,6 @@ use ratatui::widgets::ListState;
 
 pub trait ListWidget<T> {
     fn items(&self) -> &[T];
-    fn items_mut(&mut self) -> &mut Vec<T>;
     fn list_state(&self) -> &ListState;
     fn list_state_mut(&mut self) -> &mut ListState;
 
