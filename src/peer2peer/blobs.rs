@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use color_eyre::eyre::{Context, Result};
 use iroh::PublicKey;
-use iroh_blobs::{Hash, api::downloader, ticket::BlobTicket};
+use iroh_blobs::{Hash, ticket::BlobTicket};
 
 use crate::peer2peer::node::ShareNode;
 

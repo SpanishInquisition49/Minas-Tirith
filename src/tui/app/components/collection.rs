@@ -6,7 +6,7 @@ use ratatui::widgets::ListState;
 use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::{
-    database::archive::Archive,
+    database::Archive,
     schema::{collection::Collection, item::DatabaseItem},
     tui::app::traits::ListWidget,
 };

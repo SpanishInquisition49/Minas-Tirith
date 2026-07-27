@@ -9,7 +9,7 @@ use ratatui_image::{picker::Picker, protocol::StatefulProtocol};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    database::archive::Archive,
+    database::Archive,
     metadata::{cover_generator::generate_cover, image_cache::ImageCache},
     schema::{
         item::DatabaseItem,

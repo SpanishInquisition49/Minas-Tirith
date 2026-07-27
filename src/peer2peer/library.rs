@@ -2,7 +2,6 @@ use std::{borrow::Cow, str::FromStr};
 
 use chrono::{DateTime, Utc};
 use color_eyre::eyre::{Context, Result, eyre};
-use futures::SinkExt;
 use iroh::PublicKey;
 use iroh_blobs::Hash;
 use iroh_docs::{

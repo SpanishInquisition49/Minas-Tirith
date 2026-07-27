@@ -25,10 +25,6 @@ impl App {
         self.collections.select_next();
     }
 
-    pub fn colletion_list_state(&self) -> &ListState {
-        &self.collections.list_state
-    }
-
     pub fn collection_list_state_mut(&mut self) -> &mut ListState {
         &mut self.collections.list_state
     }

@@ -4,7 +4,7 @@ use ratatui::widgets::ListState;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    database::archive::Archive,
+    database::Archive,
     metadata::{dedup::MergedCandidate, facade::MetadataProvider},
     schema::{
         form::MetadataForm,

@@ -11,7 +11,7 @@ use tui_input::{Input, backend::crossterm::EventHandler};
 use uuid::Uuid;
 
 use crate::{
-    database::archive::Archive,
+    database::Archive,
     metadata::shared_library::{LibrarySubscription, SharedLibrary},
     peer2peer::{PrettyDisplay, library::SharedItemEntry, node::ShareNode},
     schema::{

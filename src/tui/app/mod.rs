@@ -15,7 +15,7 @@ use ratatui_notifications::{
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 
 use crate::{
-    database::archive::Archive,
+    database::Archive,
     metadata::{facade::MetadataProvider, image_cache::ImageCache},
     schema::{item::DatabaseItem, message::Message},
     tui::app::components::{

@@ -12,7 +12,7 @@ use tracing_subscriber::EnvFilter;
 
 use crate::{
     app_config::AppConfig,
-    database::archive::Archive,
+    database::Archive,
     metadata::image_cache::ImageCache,
     tui::{app::App, events::run},
 };

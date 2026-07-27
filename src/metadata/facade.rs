@@ -6,7 +6,6 @@ use tokio::time::timeout;
 use crate::{
     app_config::AppConfig,
     metadata::{
-        common_metadata::ItemMetadata,
         dedup::MergedCandidate,
         providers::{
             core::CoreManager, crossref::CrossrefManager, google_books::GoogleBooksManager,
