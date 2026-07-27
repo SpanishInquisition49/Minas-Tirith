@@ -19,6 +19,10 @@ pub trait ItemMetadata: Send {
     fn tags(&self) -> Vec<String>;
     fn container(&self) -> Option<Cow<'_, str>>;
 
+    fn shared_paper_id(&self) -> Option<Cow<'_, str>> {
+        None
+    }
+
     fn slug(&self) -> String {
         slugify(self.title())
     }

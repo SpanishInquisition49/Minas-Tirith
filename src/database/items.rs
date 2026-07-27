@@ -190,4 +190,14 @@ WHERE id = ?
             .with_context(|| format!("Update description for item: {item_id}"))?;
         Ok(())
     }
+
+    pub async fn set_shared_paper_id(&self, item_id: i32, paper_id: &str) -> Result<()> {
+        sqlx::query("UPDATE items SET shared_paper_id = ? WHERE id = ?")
+            .bind(paper_id)
+            .bind(item_id)
+            .execute(&self.pool)
+            .await
+            .with_context(|| format!("Setting shared_paper_id for item {item_id}"))?;
+        Ok(())
+    }
 }

@@ -15,7 +15,7 @@ pub struct AppConfig {
     #[serde(default)]
     pub api_keys: HashMap<String, String>,
     #[serde(default)]
-    pub ephemeral_identiy: bool,
+    pub ephemeral_identity: bool,
 }
 
 impl AppConfig {

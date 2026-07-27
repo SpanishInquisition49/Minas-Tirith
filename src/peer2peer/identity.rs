@@ -10,7 +10,7 @@ const KEY_FILENAME: &str = "share_identity.key";
 pub fn load_or_create_secret_key(data_dir: &Path) -> Result<SecretKey> {
     let path = data_dir.join(KEY_FILENAME);
 
-    if AppConfig::get().ephemeral_identiy {
+    if AppConfig::get().ephemeral_identity {
         return Ok(SecretKey::generate());
     }
 

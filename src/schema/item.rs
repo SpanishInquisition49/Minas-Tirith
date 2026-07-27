@@ -201,6 +201,7 @@ pub struct Item {
     pub slug: String,
     pub cover_image_url: Option<String>,
     pub container: Option<String>,
+    pub shared_paper_id: Option<String>,
 }
 
 impl fmt::Display for Item {
@@ -241,6 +242,7 @@ impl<T: ItemMetadata + Sized> From<&T> for Item {
             slug: value.slug(),
             cover_image_url: value.cover_image_url().map(|u| u.to_string()),
             container: value.container().map(|c| c.to_string()),
+            shared_paper_id: value.shared_paper_id().map(|id| id.to_string()),
         }
     }
 }

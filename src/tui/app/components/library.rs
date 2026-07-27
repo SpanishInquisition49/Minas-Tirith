@@ -222,8 +222,21 @@ impl LibraryState {
                 Err(_) => bail!("Cannot get metadata for {}", file_path.display()),
             };
 
+            let paper_id = match &item.fields.shared_paper_id {
+                Some(existing) => Uuid::parse_str(existing).with_context(|| {
+                    format!("Parsing stored shared_paper_id for item {}", item.id)
+                })?,
+                None => {
+                    let id = Uuid::new_v4();
+                    self.archive
+                        .set_shared_paper_id(item.id, &id.to_string())
+                        .await?;
+                    id
+                }
+            };
+
             let entry = SharedItemEntry {
-                paper_id: Uuid::new_v4(),
+                paper_id,
                 blob_hash: tag.hash(),
                 blob_size,
                 file_name,
