@@ -1,0 +1,32 @@
+[package]
+name = "minastirith-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+minastirith-core-derive = { path = "../core_derive" }
+color-eyre = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+sqlx = { workspace = true }
+reqwest = { workspace = true }
+slug = { workspace = true }
+human_name = { workspace = true }
+async-trait = { workspace = true }
+trait-variant = { workspace = true }
+directories = { workspace = true }
+figment = { workspace = true }
+uuid = { workspace = true }
+iroh = { workspace = true }
+iroh-blobs = { workspace = true }
+iroh-docs = { workspace = true }
+iroh-gossip = { workspace = true }
+iroh-mdns-address-lookup = { workspace = true }
+epub = { workspace = true }
+futures = { workspace = true }
+n0-future = { workspace = true }
+image = "0.25.10"
