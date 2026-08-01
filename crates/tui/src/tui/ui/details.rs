@@ -11,7 +11,7 @@ use ratatui_image::StatefulImage;
 
 use crate::{traits::Spannable, tui::app::App};
 
-pub fn draw_details<'a>(f: &mut Frame, app: &'a mut App, area: Rect) {
+pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let title = Line::from(" Details ".yellow().bold().italic());
     let instructions = Line::from(vec![
         " Navigate: ".yellow(),

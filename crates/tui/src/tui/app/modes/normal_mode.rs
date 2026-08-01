@@ -19,8 +19,8 @@ impl App {
         }
         match self.focus {
             Focus::Items => match key.code {
-                KeyCode::Char('[') => self.items_component.core_mut().tabs_prev(),
-                KeyCode::Char(']') => self.items_component.core_mut().tabs_next(),
+                KeyCode::Char('[') => self.prev_tab().await?,
+                KeyCode::Char(']') => self.next_tab().await?,
                 KeyCode::Char('q') => self.quit = true,
                 KeyCode::Char('j') | KeyCode::Down => self.next_item(),
                 KeyCode::Char('k') | KeyCode::Up => self.prev_item(),
@@ -31,7 +31,7 @@ impl App {
                 }
                 KeyCode::Char('b') => self.send_bibtex_to_system_clipboard(),
                 KeyCode::Char('c') => self.open_collection_assign_for_selected(),
-                KeyCode::Char('L') => self.library_component.core_mut().open_browse(),
+                KeyCode::Char('L') => self.open_library_browse(),
                 KeyCode::Char('/') => self.mode = Mode::Search,
                 _ => {}
             },
@@ -44,10 +44,10 @@ impl App {
                     self.bulk_bibtex_to_system_clipboard().await?;
                 }
                 KeyCode::Char('d') => self.delete_collection().await?,
-                KeyCode::Enter => self.collection_component.core_mut().confirm_selection(),
+                KeyCode::Enter => self.confirm_collection_selection().await?,
                 KeyCode::Char('q') => self.quit = true,
                 KeyCode::Char('p') => self.open_library_publish_for_selected(),
-                KeyCode::Char('L') => self.library_component.core_mut().open_manage(),
+                KeyCode::Char('L') => self.open_library_manage(),
                 _ => {}
             },
         }

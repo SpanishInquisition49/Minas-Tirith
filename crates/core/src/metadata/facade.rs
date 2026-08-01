@@ -23,6 +23,12 @@ pub struct MetadataProvider {
     providers: Vec<Arc<dyn MetadataFetcher>>,
 }
 
+impl Default for MetadataProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MetadataProvider {
     pub fn new() -> Self {
         let cfg = AppConfig::get();

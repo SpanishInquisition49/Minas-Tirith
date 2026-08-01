@@ -93,6 +93,12 @@ impl OpenLibraryManager {
     }
 }
 
+impl Default for OpenLibraryManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl MetadataFetcher for OpenLibraryManager {
     async fn fetch(

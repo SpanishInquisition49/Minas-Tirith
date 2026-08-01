@@ -41,6 +41,18 @@ impl App {
         self.items_component.core().selected_tab()
     }
 
+    pub async fn next_tab(&mut self) -> Result<()> {
+        self.items_component.core_mut().tabs_next();
+        let collection_id = self.collection_component.selected().map(|c| c.id);
+        self.items_component.refresh(collection_id).await
+    }
+
+    pub async fn prev_tab(&mut self) -> Result<()> {
+        self.items_component.core_mut().tabs_prev();
+        let collection_id = self.collection_component.selected().map(|c| c.id);
+        self.items_component.refresh(collection_id).await
+    }
+
     pub fn item_list_state_mut(&mut self) -> &mut ListState {
         self.items_component.list_state_mut()
     }

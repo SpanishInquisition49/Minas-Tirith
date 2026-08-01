@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use minastirith_core::{
     metadata::shared_library::{LibrarySubscription, SharedLibrary},
     peer2peer::library::SharedItemEntry,
-    schema::{collection::Collection, item::DatabaseItem},
+    schema::collection::Collection,
     state::{
         library::{
             browse::{BrowseFocus, LibraryBrowseState},
@@ -84,6 +84,16 @@ impl App {
 
     pub fn browse_list_state_mut(&mut self) -> &mut ListState {
         self.library_component.browse_list_state_mut()
+    }
+
+    pub fn open_library_browse(&mut self) {
+        self.library_component.core_mut().open_browse();
+        self.mode = Mode::LibraryBrowse;
+    }
+
+    pub fn open_library_manage(&mut self) {
+        self.library_component.core_mut().open_manage();
+        self.mode = Mode::LibraryManage;
     }
 
     pub fn handle_item_download_ready(&mut self, entry: SharedItemEntry, local_path: PathBuf) {
@@ -208,22 +218,19 @@ impl App {
         };
         let items_in_collection = self.archive.get_items(None, Some(collection.id)).await?;
 
-        match self
+        if let Some(name) = self
             .library_component
             .core_mut()
             .confirm_publish(name, description, items_in_collection.as_slice())
             .await?
         {
-            Some(name) => {
-                self.notify(
-                    format!("Librery '{name}' published"),
-                    " Sharing ".to_string(),
-                    Level::Info,
-                );
-            }
-            // TODO: handle error
-            None => {}
+            self.notify(
+                format!("Librery '{name}' published"),
+                " Sharing ".to_string(),
+                Level::Info,
+            );
         }
+        // TODO: handle error
 
         Ok(())
     }

@@ -19,6 +19,12 @@ impl OpenAlexManager {
     }
 }
 
+impl Default for OpenAlexManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl MetadataFetcher for OpenAlexManager {
     async fn fetch(

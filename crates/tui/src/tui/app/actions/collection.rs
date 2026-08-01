@@ -89,7 +89,7 @@ impl App {
         if self
             .collection_component
             .core_mut()
-            .open_item_assign(&self.items_component.items())
+            .open_item_assign(self.items_component.items())
         {
             self.mode = Mode::CollectionAssign;
         }
@@ -122,7 +122,7 @@ impl App {
     pub fn collection_assign_toggle_current(&mut self) {
         self.collection_component
             .core_mut()
-            .assign_toggle_current(&self.items_component.items());
+            .assign_toggle_current(self.items_component.items());
     }
 
     pub fn cancel_collection_assign(&mut self) {

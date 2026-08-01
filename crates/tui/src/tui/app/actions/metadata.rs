@@ -31,7 +31,7 @@ impl App {
     }
 
     pub fn get_metadata_candidates(&self) -> &[MergedCandidate] {
-        &self.metadata_component.core().items()
+        self.metadata_component.core().items()
     }
 
     pub fn get_metadata_list_state_mut(&mut self) -> &mut ListState {

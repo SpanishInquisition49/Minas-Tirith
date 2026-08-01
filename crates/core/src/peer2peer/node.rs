@@ -13,8 +13,12 @@ const SERVICE_NAME: &str = "minastirith-share";
 
 pub struct ShareNode {
     pub(in crate::peer2peer) endpoint: Endpoint,
+    // NOTE: kept alive for the lifetime of the node; dropping it shuts down the accept loop
+    #[allow(dead_code)]
     pub(in crate::peer2peer) router: Router,
     pub(in crate::peer2peer) blobs_store: FsStore,
+    // NOTE: kept alive for the lifetime of the node; dropping it shuts down gossip participation
+    #[allow(dead_code)]
     pub(in crate::peer2peer) gossip: Gossip,
     pub docs: Docs,
 }

@@ -11,11 +11,9 @@ impl App {
     ) -> Result<()> {
         match key.code {
             KeyCode::Tab => {
-                self.library_component
-                    .core_mut()
-                    .get_browse_state_mut()
-                    .as_mut()
-                    .and_then(|b| Some(b.focus_next()));
+                if let Some(b) = self.library_component.core_mut().get_browse_state_mut() {
+                    b.focus_next();
+                }
             }
             KeyCode::Char('j') | KeyCode::Down => {
                 self.library_component.core_mut().browse_select_next()
@@ -78,11 +76,9 @@ impl App {
     ) -> Result<()> {
         match (key.modifiers, key.code) {
             (_, KeyCode::Tab) => {
-                self.library_component
-                    .core_mut()
-                    .get_publish_state_mut()
-                    .as_mut()
-                    .and_then(|p| Some(p.focus_next()));
+                if let Some(p) = self.library_component.core_mut().get_publish_state_mut() {
+                    p.focus_next();
+                }
             }
             (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
                 self.publish_collection_as_library().await?
@@ -101,11 +97,9 @@ impl App {
     ) -> Result<()> {
         match (key.modifiers, key.code) {
             (_, KeyCode::Tab) => {
-                self.library_component
-                    .core_mut()
-                    .get_subscribe_state_mut()
-                    .as_mut()
-                    .and_then(|s| Some(s.focus_next()));
+                if let Some(s) = self.library_component.core_mut().get_subscribe_state_mut() {
+                    s.focus_next();
+                }
             }
             (KeyModifiers::CONTROL, KeyCode::Char('s')) => self.confirm_library_subscribe().await?,
             (_, KeyCode::Esc) => self.library_component.core_mut().cancel_subscribe(),

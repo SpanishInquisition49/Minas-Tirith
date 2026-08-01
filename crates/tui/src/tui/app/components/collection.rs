@@ -74,10 +74,6 @@ impl CollectionComponent {
         &self.name_input
     }
 
-    pub fn name_input_mut(&mut self) -> &mut Input {
-        &mut self.name_input
-    }
-
     pub fn handle_event(&mut self, event: &Event) {
         self.name_input.handle_event(event);
     }

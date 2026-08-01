@@ -1,7 +1,7 @@
 use color_eyre::Result;
 use minastirith_core_derive::{Cyclable, Focusable};
 
-use crate::{peer2peer::library::SharedItemEntry, state::library::LibraryState, traits::Focusable};
+use crate::{state::library::LibraryState, traits::Focusable};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Cyclable, Default)]
 pub enum BrowseFocus {

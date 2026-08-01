@@ -126,10 +126,18 @@ impl ItemMetadata for CoreItem {
     }
 
     fn tags(&self) -> Vec<String> {
-        Vec::new()
+        if self.field_of_study.is_empty() {
+            Vec::new()
+        } else {
+            vec![self.field_of_study.clone()]
+        }
     }
 
     fn container(&self) -> Option<Cow<'_, str>> {
-        None
+        if self.publisher.is_empty() {
+            None
+        } else {
+            Some(Cow::Borrowed(&self.publisher))
+        }
     }
 }

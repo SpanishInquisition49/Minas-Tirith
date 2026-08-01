@@ -118,6 +118,12 @@ impl SemanticScholarManager {
     }
 }
 
+impl Default for SemanticScholarManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl MetadataFetcher for SemanticScholarManager {
     async fn fetch(

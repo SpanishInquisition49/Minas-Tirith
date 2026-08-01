@@ -162,6 +162,12 @@ impl CrossrefManager {
     }
 }
 
+impl Default for CrossrefManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl MetadataFetcher for CrossrefManager {
     async fn fetch(
