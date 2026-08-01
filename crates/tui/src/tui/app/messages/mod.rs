@@ -5,7 +5,7 @@ use minastirith_core::{
 };
 use ratatui_notifications::Level;
 
-use crate::tui::app::{App, Mode};
+use crate::tui::app::{App, Mode, components::cover::CoverMessage};
 
 impl App {
     fn handle_metadata_search_message(&mut self, candidates: Vec<MergedCandidate>) {
@@ -76,6 +76,7 @@ impl App {
     }
 
     pub async fn poll_messages(&mut self) -> Result<()> {
+        // NOTE: Listen for core messages
         while let Ok(message) = self.task_channel_rx.try_recv() {
             match message {
                 Message::Save(outcome) => self.handle_save_message(outcome).await?,
@@ -105,6 +106,19 @@ impl App {
                 }
             }
         }
+        // NOTE: Listen for cover messages
+        while let Ok(message) = self.cover_channel_rx.try_recv() {
+            match message {
+                CoverMessage::Ready(cover_image_data) => {
+                    self.covers.handle_ready(
+                        cover_image_data,
+                        self.items_component.core_mut().items_mut(),
+                    );
+                }
+                CoverMessage::Failed { item_id } => self.covers.handle_failed(item_id),
+            }
+        }
+
         Ok(())
     }
 }

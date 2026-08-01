@@ -1,23 +1,23 @@
 use std::collections::HashMap;
 
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use color_eyre::eyre::Result;
 use ratatui_notifications::Level;
 
 use crate::tui::app::App;
 
 impl App {
-    pub fn bulk_bibtex_to_system_clipboard(&mut self) {
-        if self.collection_component.selected().is_none() {
+    pub async fn bulk_bibtex_to_system_clipboard(&mut self) -> Result<()> {
+        let Some(id) = self.collection_component.selected().map(|c| c.id) else {
             self.notify(
                 "No selected collection",
                 " Bulk Export citation ".to_string(),
                 Level::Error,
             );
-            return;
+            return Ok(());
         };
-        // NOTE: check if here we need to query the database, if some filters are active
-        // not all the items in the collection are gathered here
-        let items = self.items_component.items();
+
+        let items = self.archive.get_items(None, Some(id)).await?;
 
         // NOTE: to handle possible cite keys overlap we keep track of the used keys
         // and append to conflicting keys their version (an incremental counter)
@@ -41,6 +41,7 @@ impl App {
             "Collection bibtex sent to clipboard".to_string(),
             bibtex,
         );
+        Ok(())
     }
 
     pub fn send_bibtex_to_system_clipboard(&mut self) {

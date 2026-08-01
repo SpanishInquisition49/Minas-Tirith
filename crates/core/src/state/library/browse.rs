@@ -47,14 +47,10 @@ impl LibraryState {
 
     pub fn current_namespace(&self) -> Option<&str> {
         let s = self.browse.as_ref()?;
-        let i = s.selected_item_index?;
+        let i = s.selected_subscriptions_index?;
         self.subscriptions
             .get(i)
             .map(|sub| sub.namespace_id.as_str())
-    }
-
-    pub fn current_items(&self) -> &[SharedItemEntry] {
-        todo!()
     }
 
     /// Refresh the item for the selected namespace in the browse list
@@ -74,7 +70,7 @@ impl LibraryState {
     pub fn open_browse(&mut self) {
         let mut browse = LibraryBrowseState::default();
         if !self.subscriptions.is_empty() {
-            browse.selected_item_index_mut().replace(0);
+            browse.selected_subscriptions_index_mut().replace(0);
         }
         self.browse = Some(browse);
     }
@@ -84,7 +80,10 @@ impl LibraryState {
     }
 
     pub fn browse_select_next(&mut self) {
-        let items_len = self.current_items().len();
+        let Some(namespace) = self.current_namespace() else {
+            return;
+        };
+        let items_len = self.browsed_items.get(namespace).map_or(0, |v| v.len());
         let Some(browse) = &mut self.browse else {
             return;
         };
@@ -117,7 +116,10 @@ impl LibraryState {
     }
 
     pub fn browse_select_prev(&mut self) {
-        let items_len = self.current_items().len();
+        let Some(namespace) = self.current_namespace() else {
+            return;
+        };
+        let items_len = self.browsed_items.get(namespace).map_or(0, |v| v.len());
         let Some(browse) = &mut self.browse else {
             return;
         };
@@ -161,7 +163,16 @@ impl LibraryState {
             return;
         };
 
-        let Some(entry) = self.current_items().get(i).cloned() else {
+        let Some(current_namespace) = self.current_namespace() else {
+            return;
+        };
+
+        let Some(entry) = self
+            .browsed_items
+            .get(current_namespace)
+            .map(|vec| vec.get(i).cloned())
+            .unwrap_or(None)
+        else {
             return;
         };
         self.request_import(entry);

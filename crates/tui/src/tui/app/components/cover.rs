@@ -77,7 +77,7 @@ impl CoverComponent {
 
     /// Applies an inbound 'ItemCover' message: stores the decoded protocol
     /// and, for the generated covers, persist the URL on the item
-    pub fn handle_ready(&mut self, data: CoverImageData, items: &mut [DatabaseItem]) {
+    pub fn handle_ready(&mut self, data: Box<CoverImageData>, items: &mut [DatabaseItem]) {
         self.pending.remove(&data.item_id);
         self.covers.insert(data.item_id, data.protocol);
         if let Some(url) = data.url

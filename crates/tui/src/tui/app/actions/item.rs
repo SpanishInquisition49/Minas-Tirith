@@ -2,7 +2,10 @@ use color_eyre::Result;
 use minastirith_core::{schema::item::DatabaseItem, traits::Selectable};
 use ratatui::widgets::ListState;
 
-use crate::tui::app::{App, Mode};
+use crate::{
+    traits::SelectableSync,
+    tui::app::{App, Mode},
+};
 
 impl App {
     pub fn items(&self) -> &[DatabaseItem] {
@@ -24,8 +27,14 @@ impl App {
             .replace(index);
     }
 
-    pub fn selected_item_mut(&mut self) -> Option<&mut DatabaseItem> {
-        self.items_component.core_mut().selected_item_mut()
+    pub fn next_item(&mut self) {
+        self.items_component.core_mut().select_next();
+        self.items_component.sync();
+    }
+
+    pub fn prev_item(&mut self) {
+        self.items_component.core_mut().select_prev();
+        self.items_component.sync();
     }
 
     pub fn selected_tab(&self) -> usize {

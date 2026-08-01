@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
-use minastirith_core::traits::{Focusable, Selectable};
+use minastirith_core::traits::Focusable;
 
 use crate::tui::app::{App, Focus, Mode};
 
@@ -22,8 +22,8 @@ impl App {
                 KeyCode::Char('[') => self.items_component.core_mut().tabs_prev(),
                 KeyCode::Char(']') => self.items_component.core_mut().tabs_next(),
                 KeyCode::Char('q') => self.quit = true,
-                KeyCode::Char('j') | KeyCode::Down => self.items_component.core_mut().select_next(),
-                KeyCode::Char('k') | KeyCode::Up => self.items_component.core_mut().select_prev(),
+                KeyCode::Char('j') | KeyCode::Down => self.next_item(),
+                KeyCode::Char('k') | KeyCode::Up => self.prev_item(),
                 KeyCode::Enter => self.items_component.core().open_item()?,
                 KeyCode::Char('a') => self.request_open_file_picker()?,
                 KeyCode::Char('e') => {
@@ -40,7 +40,9 @@ impl App {
                 KeyCode::Char('k') | KeyCode::Up => self.select_collection_prev(),
                 KeyCode::Char('n') => self.open_collection_create(),
                 KeyCode::Char('c') => self.open_item_assign_for_selected_collection(),
-                KeyCode::Char('b') => self.bulk_bibtex_to_system_clipboard(),
+                KeyCode::Char('b') => {
+                    self.bulk_bibtex_to_system_clipboard().await?;
+                }
                 KeyCode::Char('d') => self.delete_collection().await?,
                 KeyCode::Enter => self.collection_component.core_mut().confirm_selection(),
                 KeyCode::Char('q') => self.quit = true,
