@@ -58,6 +58,14 @@ impl LibraryPublishState {
 
 // NOTE: methods related to the publish of collections
 impl LibraryState {
+    pub fn get_publish_state(&self) -> &Option<LibraryPublishState> {
+        &self.publish
+    }
+
+    pub fn get_publish_state_mut(&mut self) -> &mut Option<LibraryPublishState> {
+        &mut self.publish
+    }
+
     pub fn open_publish(&mut self, collection_id: i32, collection_name: String) {
         self.publish = Some(LibraryPublishState::new(collection_id, collection_name))
     }
@@ -72,7 +80,7 @@ impl LibraryState {
         &mut self,
         name: String,
         description: Option<String>,
-        items_in_collection: &[&DatabaseItem],
+        items_in_collection: &[DatabaseItem],
     ) -> Result<Option<String>> {
         let Some(s) = &self.publish else {
             return Ok(None);
@@ -85,7 +93,7 @@ impl LibraryState {
         }
 
         let result = self
-            .publish_colletion(
+            .publish_collection(
                 collection_id,
                 name.clone(),
                 description,

@@ -15,8 +15,9 @@ pub const FIELD_LABELS: [&str; 8] = [
     "Cover URL",
 ];
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Field {
+    #[default]
     Title,
     Description,
     Container,

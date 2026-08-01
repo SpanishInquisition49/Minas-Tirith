@@ -13,7 +13,6 @@ const SERVICE_NAME: &str = "minastirith-share";
 
 pub struct ShareNode {
     pub(in crate::peer2peer) endpoint: Endpoint,
-    pub(in crate::peer2peer) mdns: MdnsAddressLookup,
     pub(in crate::peer2peer) router: Router,
     pub(in crate::peer2peer) blobs_store: FsStore,
     pub(in crate::peer2peer) gossip: Gossip,
@@ -66,7 +65,6 @@ impl ShareNode {
 
         Ok(Self {
             endpoint,
-            mdns,
             router,
             blobs_store,
             gossip,

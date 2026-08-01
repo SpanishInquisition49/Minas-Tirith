@@ -132,7 +132,7 @@ impl ShareNode {
     }
 
     pub async fn share_library(&self, doc: &Doc) -> Result<DocTicket> {
-        doc.share(ShareMode::Read, AddrInfoOptions::Id.into())
+        doc.share(ShareMode::Read, AddrInfoOptions::Id)
             .await
             .map_err(|_| eyre!("Generating doc ticket"))
     }

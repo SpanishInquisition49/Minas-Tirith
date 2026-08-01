@@ -1,4 +1,5 @@
 use core::fmt;
+use std::borrow::Cow;
 
 use human_name::Name;
 use serde::Deserialize;
@@ -187,6 +188,52 @@ impl DatabaseItem {
             (Some(a), None) => a,
             (None, _) => slugify(&self.fields.title),
         }
+    }
+}
+
+impl ItemMetadata for DatabaseItem {
+    fn title(&self) -> Cow<'_, str> {
+        Cow::Borrowed(&self.fields.title)
+    }
+
+    fn description(&self) -> Option<Cow<'_, str>> {
+        self.fields.description.as_deref().map(Cow::Borrowed)
+    }
+
+    fn item_type(&self) -> ItemType {
+        ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::default())
+    }
+
+    fn authors(&self) -> Vec<String> {
+        self.authors.iter().map(|a| a.name.clone()).collect()
+    }
+
+    fn isbn(&self) -> Option<Cow<'_, str>> {
+        self.fields.isbn.as_deref().map(Cow::Borrowed)
+    }
+
+    fn doi(&self) -> Option<Cow<'_, str>> {
+        self.fields.doi.as_deref().map(Cow::Borrowed)
+    }
+
+    fn publication_date(&self) -> Option<Cow<'_, str>> {
+        self.fields.publication_date.as_deref().map(Cow::Borrowed)
+    }
+
+    fn cover_image_url(&self) -> Option<Cow<'_, str>> {
+        self.fields.cover_image_url.as_deref().map(Cow::Borrowed)
+    }
+
+    fn source(&self) -> Cow<'_, str> {
+        Cow::Owned("database".to_string())
+    }
+
+    fn tags(&self) -> Vec<String> {
+        self.tags.iter().map(|t| t.name.clone()).collect()
+    }
+
+    fn container(&self) -> Option<Cow<'_, str>> {
+        self.fields.container.as_deref().map(Cow::Borrowed)
     }
 }
 

@@ -1,0 +1,212 @@
+use color_eyre::Result;
+use std::{
+    collections::{HashSet, hash_set::Difference},
+    hash::RandomState,
+};
+
+use crate::{
+    schema::{collection::Collection, item::DatabaseItem},
+    state::collection::CollectionState,
+};
+
+#[derive(Clone, Copy, Debug)]
+pub enum AssignMode {
+    /// Assign items to the selected collection
+    Items,
+    /// Assign collections to the selected item
+    Collections,
+}
+
+pub struct CollectionAssignState {
+    mode: AssignMode,
+    id: i32,
+    original: HashSet<i32>,
+    selected: HashSet<i32>,
+    selected_index: Option<usize>,
+}
+
+impl CollectionAssignState {
+    pub fn new(mode: AssignMode, id: i32, original: HashSet<i32>) -> Self {
+        let selected = original.clone();
+        Self {
+            mode,
+            id,
+            original,
+            selected,
+            selected_index: Some(0),
+        }
+    }
+
+    pub fn mode(&self) -> AssignMode {
+        self.mode
+    }
+
+    pub fn id(&self) -> i32 {
+        self.id
+    }
+
+    pub fn selected(&self) -> &HashSet<i32> {
+        &self.selected
+    }
+
+    pub fn selected_mut(&mut self) -> &mut HashSet<i32> {
+        &mut self.selected
+    }
+
+    pub fn add_list(&self) -> Difference<'_, i32, RandomState> {
+        self.selected.difference(&self.original)
+    }
+
+    pub fn remove_list(&self) -> Difference<'_, i32, RandomState> {
+        self.original.difference(&self.selected)
+    }
+
+    pub fn selected_index(&self) -> Option<usize> {
+        self.selected_index
+    }
+
+    pub fn selected_index_mut(&mut self) -> &mut Option<usize> {
+        &mut self.selected_index
+    }
+}
+
+impl CollectionState {
+    pub fn open_item_assign(&mut self, items: &[DatabaseItem]) -> bool {
+        if items.is_empty() {
+            return false;
+        }
+        let Some(id) = self.selected_collection_id() else {
+            return false;
+        };
+
+        if Collection::is_trivial_collection(id) {
+            return false;
+        }
+
+        let original: HashSet<i32> = items
+            .iter()
+            .filter_map(|i| {
+                if i.collections.iter().any(|c| c.id == id) {
+                    Some(i.id)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        self.assign = Some(CollectionAssignState::new(AssignMode::Items, id, original));
+        true
+    }
+
+    pub fn open_collection_assign(&mut self, item_id: i32, original: HashSet<i32>) {
+        self.assign = Some(CollectionAssignState::new(
+            AssignMode::Collections,
+            item_id,
+            original,
+        ));
+    }
+
+    pub fn assign_next(&mut self, items_len: usize) {
+        let Some(assign) = self.assign.as_mut() else {
+            return;
+        };
+        let len = match assign.mode() {
+            AssignMode::Items => items_len,
+            // NOTE: ignore the "All" collection
+            AssignMode::Collections => self.collections.len() - 1,
+        };
+        if len == 0 {
+            return;
+        }
+        let i = match assign.selected_index() {
+            Some(i) if i + 1 < len => i + 1,
+            _ => 0,
+        };
+        assign.selected_index_mut().replace(i);
+    }
+
+    pub fn assign_prev(&mut self, items_len: usize) {
+        let Some(assign) = self.assign.as_mut() else {
+            return;
+        };
+        let len = match assign.mode() {
+            AssignMode::Items => items_len,
+            // NOTE: ignore the "All" collection
+            AssignMode::Collections => self.collections.len() - 1,
+        };
+        if len == 0 {
+            return;
+        }
+        let i = match assign.selected_index() {
+            Some(i) if i > 0 => i - 1,
+            _ => len - 1,
+        };
+        assign.selected_index_mut().replace(i);
+    }
+
+    pub fn assign_toggle_current(&mut self, items: &[DatabaseItem]) {
+        let Some(assign) = self.assign.as_mut() else {
+            return;
+        };
+        let Some(index) = assign.selected_index() else {
+            return;
+        };
+
+        let id = match assign.mode() {
+            AssignMode::Items => {
+                let Some(id) = items.get(index).map(|i| i.id) else {
+                    return;
+                };
+                id
+            }
+            AssignMode::Collections => {
+                let Some(id) = self.collections.get(index + 1).map(|c| c.id) else {
+                    return;
+                };
+                id
+            }
+        };
+
+        if !assign.selected_mut().remove(&id) {
+            assign.selected_mut().insert(id);
+        }
+    }
+
+    pub fn cancel_assign(&mut self) {
+        self.assign = None
+    }
+
+    pub async fn confirm_assign(&mut self) -> Result<()> {
+        let Some(assign) = self.assign.take() else {
+            return Ok(());
+        };
+
+        match assign.mode() {
+            AssignMode::Items => {
+                for item_id in assign.add_list() {
+                    self.archive
+                        .add_item_to_collection(*item_id, assign.id())
+                        .await?;
+                }
+                for item_id in assign.remove_list() {
+                    self.archive
+                        .remove_item_from_collection(*item_id, assign.id())
+                        .await?;
+                }
+            }
+            AssignMode::Collections => {
+                for collection_id in assign.add_list() {
+                    self.archive
+                        .add_item_to_collection(assign.id(), *collection_id)
+                        .await?;
+                }
+
+                for collection_id in assign.remove_list() {
+                    self.archive
+                        .remove_item_from_collection(assign.id(), *collection_id)
+                        .await?;
+                }
+            }
+        }
+        Ok(())
+    }
+}

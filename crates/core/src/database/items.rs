@@ -9,12 +9,23 @@ use sqlx::{Row, sqlite::SqliteRow};
 
 use crate::{
     database::Archive,
-    metadata::common_metadata::ItemMetadata,
-    schema::item::{DatabaseItem, RawItemRow},
+    metadata::common_metadata::{ItemMetadata, ItemType},
+    schema::{
+        collection::Collection,
+        item::{DatabaseItem, RawItemRow},
+    },
 };
 
 impl Archive {
-    pub async fn get_all_items(&self) -> Result<Vec<DatabaseItem>> {
+    pub async fn get_items(
+        &self,
+        item_type: Option<ItemType>,
+        collection_id: Option<i32>,
+    ) -> Result<Vec<DatabaseItem>> {
+        let collection_id = match collection_id {
+            Some(id) if !Collection::is_trivial_collection(id) => Some(id),
+            _ => None,
+        };
         let items: Vec<RawItemRow> = sqlx::query_as(
             "
 SELECT i.*, c.collections, a.authors, t.tags
@@ -22,8 +33,20 @@ FROM items AS i
 LEFT JOIN view_collections_aggregated AS c ON c.item_id = i.id
 LEFT JOIN view_authors_aggregated AS a ON a.item_id = i.id
 LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id
-ORDER BY i.title",
+WHERE i.type = COALESCE(?, i.type)
+AND (
+    ? IS NULL
+    OR EXISTS(
+        SELECT 1
+        FROM json_each(c.collections) AS je
+        WHERE json_extract(je.value, '$.id') = ?)
+    )
+ORDER BY i.title
+",
         )
+        .bind(item_type.map(|i| i.to_string()))
+        .bind(collection_id)
+        .bind(collection_id)
         .fetch_all(&self.pool)
         .await
         .context("Fetching Items")?;

@@ -3,7 +3,6 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use iroh::PublicKey;
 
 pub mod blobs;
-pub mod discovery;
 pub mod identity;
 pub mod library;
 pub mod node;

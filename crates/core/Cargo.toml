@@ -30,3 +30,4 @@ epub = { workspace = true }
 futures = { workspace = true }
 n0-future = { workspace = true }
 image = "0.25.10"
+opener = "0.8.5"

@@ -37,6 +37,14 @@ impl LibraryBrowseState {
 }
 
 impl LibraryState {
+    pub fn get_browse_state(&self) -> &Option<LibraryBrowseState> {
+        &self.browse
+    }
+
+    pub fn get_browse_state_mut(&mut self) -> &mut Option<LibraryBrowseState> {
+        &mut self.browse
+    }
+
     pub fn current_namespace(&self) -> Option<&str> {
         let s = self.browse.as_ref()?;
         let i = s.selected_item_index?;

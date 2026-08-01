@@ -2,10 +2,7 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use crate::{
-    metadata::dedup::MergedCandidate,
-    peer2peer::{discovery::PeerInfo, library::SharedItemEntry},
-};
+use crate::{metadata::dedup::MergedCandidate, peer2peer::library::SharedItemEntry};
 
 #[derive(Debug)]
 pub enum SaveOutcome {
@@ -38,8 +35,6 @@ pub enum Message {
     Save(SaveOutcome),
     Metadata(Vec<MergedCandidate>),
     Abstract(AbstractData),
-    PeerDiscovered(PeerInfo),
-    PeerExpired(PeerInfo),
     LibraryItemsDiscovered(Box<LibraryItemsDiscovered>),
     ItemDownloadReady(Box<LibraryDownloadReady>),
     ItemDownloadFailed(Box<LibraryDownloadFailed>),

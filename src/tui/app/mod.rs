@@ -52,8 +52,6 @@ pub enum Mode {
     Help,
 }
 
-pub const TABS_LABELS: [&str; 6] = ["All", "Book", "Article", "Thesis", "Report", "Misc"];
-
 pub struct App {
     // TODO: make all this fields private for other crates
     pub(in crate::tui::app) notifications: Notifications,

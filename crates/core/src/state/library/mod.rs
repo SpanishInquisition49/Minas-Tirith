@@ -43,13 +43,13 @@ pub struct LibraryState {
 impl LibraryState {
     pub fn new(
         archive: Arc<Archive>,
-        share_node: Arc<ShareNode>,
+        share_node: ShareNode,
         tx: Arc<UnboundedSender<Message>>,
         import_dir: PathBuf,
     ) -> Self {
         Self {
             archive,
-            share_node,
+            share_node: Arc::new(share_node),
             tx,
             import_dir,
             browse: None,
@@ -70,13 +70,28 @@ impl LibraryState {
         Ok(())
     }
 
+    pub fn subscriptions(&self) -> &[LibrarySubscription] {
+        self.subscriptions.as_slice()
+    }
+
+    pub fn shared_libraries(&self) -> &[SharedLibrary] {
+        self.shared_libraries.as_slice()
+    }
+
+    pub fn current_library_entries(&self) -> &[SharedItemEntry] {
+        self.current_namespace()
+            .and_then(|ns| self.browsed_items.get(ns))
+            .map(Vec::as_slice)
+            .unwrap_or_default()
+    }
+
     /// Publish the given collection and return the corresponding ticket
-    pub(in crate::state::library) async fn publish_colletion(
+    pub(in crate::state::library) async fn publish_collection(
         &mut self,
         collection_id: i32,
         name: String,
         description: Option<String>,
-        items_in_collection: &[&DatabaseItem],
+        items_in_collection: &[DatabaseItem],
     ) -> Result<String> {
         let (doc, author) = self.share_node.create_library().await?;
         let namespace_id = doc.id().to_string();

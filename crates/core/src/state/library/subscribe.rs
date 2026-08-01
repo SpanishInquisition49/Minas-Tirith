@@ -32,6 +32,14 @@ impl LibrarySubscribeState {
 
 // NOTE: method related to the subscription of collections from other peers
 impl LibraryState {
+    pub fn get_subscribe_state(&self) -> &Option<LibrarySubscribeState> {
+        &self.subscribe
+    }
+
+    pub fn get_subscribe_state_mut(&mut self) -> &mut Option<LibrarySubscribeState> {
+        &mut self.subscribe
+    }
+
     pub fn open_subscribe(&mut self) {
         self.subscribe = Some(LibrarySubscribeState::default());
     }

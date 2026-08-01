@@ -34,6 +34,14 @@ impl LibraryManageState {
 }
 
 impl LibraryState {
+    pub fn get_manage_state(&self) -> &Option<LibraryManageState> {
+        &self.manage
+    }
+
+    pub fn get_manage_state_mut(&mut self) -> &mut Option<LibraryManageState> {
+        &mut self.manage
+    }
+
     pub fn open_manage(&mut self) {
         let mut manage = LibraryManageState::default();
         if !self.shared_libraries.is_empty() {
