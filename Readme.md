@@ -4,160 +4,179 @@
 
 # Minas Tirith
 
-Minas Tirith is a terminal-first personal reference manager for books, articles, reports, theses, and miscellaneous documents.
+Minas Tirith is a terminal-first, offline-capable personal reference manager for books, articles, theses, reports, and miscellaneous documents. It stores your library locally in SQLite, fetches metadata from several bibliographic providers so you don't have to type it in by hand, and lets you share collections directly with other peers over a peer-to-peer network — no server required.
 
-It stores metadata in SQLite, fetches candidates from Open Library, Crossref, and OpenAlex, lets you review/edit metadata before saving, and shows document covers directly in the TUI.
+## Features
 
-## Current capabilities
+**Reference management**
 
-- Add references by choosing a local `.pdf` or `.epub` file from an in-app file explorer
-- Fetch metadata candidates from:
-  - Open Library (`title`, authors, year, ISBN when available, cover URL)
-  - Crossref (`title`, authors, DOI, publication date, inferred item type)
-  - OpenAlex (`title`, authors, DOI, publication date, source venue, concepts as tags)
-- Select a candidate, edit metadata, and save to the archive
-- Edit metadata for already-saved publications
-- Open a saved file from the list
-- Copy the selected item's BibTeX entry to the system clipboard
-- Copy BibTeX entries for the selected collection to the system clipboard
-- Filter the item list by type and by selected collection
-- Create and delete collections
-- Assign items to collections (from either the item list or collection view)
-- Display cached/downloaded covers, or generate covers from local files:
-  - PDF: first page via `pdftoppm`
-  - EPUB: embedded cover via `epub` crate
-- Auto-fetch missing abstracts for selected items when possible
-- Persist items, authors, and tags in SQLite through SQLx migrations
+- Add references by picking a local `.pdf` or `.epub` file from an in-app file explorer
+- Review and edit fetched metadata before saving, or edit it later
+- Organize items into collections; filter the item list by collection and by item type
+- Export a single item, or an entire collection, as BibTeX to the system clipboard
+- Cover art shown inline in the terminal: cached/downloaded covers, or generated locally
+  (PDF: first page via `pdftoppm`; EPUB: embedded cover via the `epub` crate)
+- Auto-fetches missing abstracts for the selected item when a provider can supply one
+
+**Metadata fetching**
+
+Candidates are pulled from multiple providers and merged/deduplicated before you pick one:
+
+| Provider          | Data                                                              | Requires API key |
+| ------------------ | ------------------------------------------------------------------ | :---------------: |
+| Open Library       | title, authors, year, ISBN, cover URL                              |         no        |
+| Crossref            | title, authors, DOI, publication date, inferred item type          |         no        |
+| OpenAlex            | title, authors, DOI, publication date, source venue, concepts as tags |      no        |
+| Semantic Scholar    | title, authors, DOI, publication date, venue                       |         no        |
+| Google Books        | title, authors, DOI, publisher, categories as tags                 |        yes        |
+| CORE                | title, authors, DOI, publication date, field of study, publisher   |        yes        |
+
+**Peer-to-peer library sharing**
+
+Built on [iroh](https://iroh.computer) — no accounts, no central server:
+
+- Publish a collection as a shared library; get back an invite ticket to hand out
+- Subscribe to someone else's shared library using their ticket
+- Browse a subscribed library's papers and import individual items into your own archive
+- Manage your own published libraries: regenerate/copy tickets, revoke a publication
+- Subscriptions stay live — updates from the owner sync in the background
+
+## Project layout
+
+This is a Cargo workspace:
+
+| Crate                | What it is                                                          |
+| --------------------- | ---------------------------------------------------------------------- |
+| `minastirith-core`     | Application/domain logic: database access, metadata providers, p2p sharing, shared state — no UI code |
+| `minastirith-core-derive` | Proc macros used by `core` (`Selectable`, `Focusable`, `Cyclable`)  |
+| `minastirith-tui`      | The terminal UI (binary: `minastirith`) — the primary, usable front-end |
+| `minastirith-gui`      | A graphical front-end (binary: `minastirith-app`) — early scaffold, not yet functional |
 
 ## Keybindings
 
-### Normal mode (items focus)
+### Normal mode — items focus
 
-| Key          | Action                                |
-| ------------ | ------------------------------------- |
-| `j` / `Down` | Select next item                      |
-| `k` / `Up`   | Select previous item                  |
-| `[` / `]`    | Switch item type tab                  |
-| `a`          | Open file explorer (add flow)         |
-| `e`          | Edit selected item metadata           |
-| `b`          | Copy selected item as BibTeX          |
-| `c`          | Assign selected item to collections   |
-| `Enter`      | Open selected file with system opener |
-| `Tab`        | Switch focus to collections           |
-| `q`          | Quit                                  |
+| Key          | Action                              |
+| ------------ | ------------------------------------ |
+| `j` / `Down` | Select next item                     |
+| `k` / `Up`   | Select previous item                 |
+| `[` / `]`    | Previous / next item type tab        |
+| `a`          | Open file explorer to add a new item |
+| `e`          | Edit selected item metadata          |
+| `b`          | Copy selected item as BibTeX         |
+| `c`          | Assign selected item to collections  |
+| `L`          | Browse subscribed shared libraries   |
+| `Enter`      | Open selected file                   |
+| `Tab`        | Switch focus to collections          |
+| `q`          | Quit                                 |
 
-### Normal mode (collections focus)
+### Normal mode — collections focus
 
-| Key          | Action                                           |
-| ------------ | ------------------------------------------------ |
-| `j` / `Down` | Select next collection                           |
-| `k` / `Up`   | Select previous collection                       |
-| `n`          | Create a new collection                          |
-| `d`          | Delete selected collection                       |
-| `c`          | Assign items to selected collection              |
-| `b`          | Copy BibTeX for selected collection's items      |
-| `Enter`      | Use selected collection as active list filter    |
-| `Tab`        | Switch focus to items                            |
-| `q`          | Quit                                             |
+| Key          | Action                                     |
+| ------------ | -------------------------------------------- |
+| `j` / `Down` | Select next collection                       |
+| `k` / `Up`   | Select previous collection                   |
+| `n`          | Create a new collection                      |
+| `d`          | Delete selected collection                   |
+| `c`          | Assign items to selected collection          |
+| `b`          | Copy BibTeX for the collection's items       |
+| `p`          | Publish selected collection as a shared library |
+| `L`          | Manage your published shared libraries       |
+| `Enter`      | Use collection as active list filter         |
+| `Tab`        | Switch focus to items                        |
+| `q`          | Quit                                         |
 
-### Insert mode (file explorer popup)
+`?` opens the in-app help screen from anywhere in normal mode, listing every binding below.
 
-| Key                       | Action                                     |
-| ------------------------- | ------------------------------------------ |
-| `a`                       | Fetch metadata candidates for current file |
-| `Esc` / `Backspace` / `q` | Return to normal mode                      |
+### Popups
 
-### Metadata selection popup
-
-| Key          | Action                  |
-| ------------ | ----------------------- |
-| `j` / `Down` | Next candidate          |
-| `k` / `Up`   | Previous candidate      |
-| `Enter`      | Open metadata edit form |
-| `Esc` / `q`  | Cancel                  |
-
-### Metadata edit popup
-
-| Key          | Action                      |
-| ------------ | --------------------------- |
-| `j` / `Down` | Next field                  |
-| `k` / `Up`   | Previous field              |
-| `Enter`      | Toggle field text editing   |
-| `t`          | Cycle item type             |
-| `Backspace`  | Delete char (while editing) |
-| `Ctrl+S`     | Save                        |
-| `Esc` / `q`  | Cancel                      |
-
-### Collection create popup
-
-| Key     | Action                      |
-| ------- | --------------------------- |
-| `Enter` | Create collection           |
-| `Esc`   | Cancel                      |
-
-### Collection assign popup
-
-| Key                    | Action                 |
-| ---------------------- | ---------------------- |
-| `j` / `Down`           | Next item/collection   |
-| `k` / `Up`             | Previous item/collection |
-| `Space` / `Enter`      | Toggle assignment      |
-| `Ctrl+S`               | Save assignments       |
-| `Esc` / `q`            | Cancel                 |
+| Popup               | Keys                                                       |
+| -------------------- | ------------------------------------------------------------ |
+| File explorer         | `a` fetch metadata for file · `Esc`/`Backspace`/`q` back      |
+| Metadata selection    | `j`/`k` navigate · `Enter` open edit form · `Esc`/`q` cancel  |
+| Metadata edit         | `j`/`k` navigate fields · `Enter` toggle editing · `t` cycle item type · `Ctrl+S` save · `Esc`/`q` cancel |
+| Collection create      | `Enter` create · `Esc` cancel                                 |
+| Collection assign      | `j`/`k` navigate · `Space`/`Enter` toggle · `Ctrl+S` save · `Esc`/`q` cancel |
+| Library publish       | `Tab` switch field · `Ctrl+S` publish & generate ticket · `Esc` cancel |
+| Library subscribe     | `Tab` switch field · `Ctrl+S` subscribe using ticket · `Esc` cancel |
+| Library browse        | `Tab` switch subscriptions/papers · `j`/`k` navigate · `a` add subscription · `d` remove subscription · `Enter` import paper · `Esc`/`q` close |
+| Library manage        | `j`/`k` navigate · `t` generate/refresh ticket · `c` copy ticket · `d` delete publication · `Esc`/`q` close |
+| Help                  | `j`/`k` scroll · `Esc`/`q` close                              |
 
 ## Build and run
 
+Run the TUI (the primary, usable front-end):
+
 ```bash
-cargo run
+cargo run --bin minastirith
 ```
 
-Build release binary:
+Build release binaries:
 
 ```bash
 cargo build --release
 ```
 
-Install locally:
+Install the TUI locally:
 
 ```bash
-cargo install --path .
+cargo install --path crates/tui
 ```
+
+## Configuration
+
+Configuration is read from `<config_dir>/config.toml`, overridable with `MINASTIRITH_`-prefixed environment variables.
+
+```toml
+[api_keys]
+google_books = "..."
+core = "..."
+
+ephemeral_identity = false
+```
+
+- `api_keys` — provider name → API key, for providers that require one (Google Books, CORE)
+- `ephemeral_identity` — when `true`, generates a fresh p2p identity every run instead of persisting one to disk (useful for testing)
 
 ## Requirements
 
 - Rust toolchain
-- `pdftoppm` available in `PATH` for PDF cover generation (Poppler)
+- `pdftoppm` available on `PATH` for PDF cover generation (Poppler)
 - A terminal/protocol combination supported by `ratatui-image` for inline cover rendering
 
 ## Storage paths
 
-Data and cache directories are resolved with `directories::ProjectDirs("com", "TheSpanishInquisition", "minastirith")`.
+Data and cache directories are resolved via `directories::ProjectDirs("com", "TheSpanishInquisition", "minastirith")`.
 
-- Database file: `<data_dir>/minastirith.db`
+- Database: `<data_dir>/minastirith.db`
 - Cover cache: `<cache_dir>/covers/`
+- P2P share identity key: `<data_dir>/share_identity.key`
+- Config file: `<config_dir>/config.toml`
 
-Migrations are applied automatically at startup via `sqlx::migrate!()`.
+Database migrations run automatically at startup via `sqlx::migrate!()`.
 
 ## Database shape
-
-Main table graph:
 
 ```
 items ──┬── item_authors ──── authors
         ├── item_tags ─────── tags
-        └── item_collections ─ collections
+        └── item_collections ─ collections ── shared_libraries
+                                                     │
+                                       library_subscriptions
 ```
+
+`shared_libraries` tracks collections you've published; `library_subscriptions` tracks libraries you follow from other peers.
 
 ## Status
 
 This repository is in **active development**.
 
-The local archive workflow is already usable end-to-end (add/edit/open items, metadata fetch, collections, BibTeX export, cover caching, and SQLite-backed persistence).
+The local archive workflow is usable end-to-end: add/edit/open items, fetch metadata, organize collections, export BibTeX, cache covers, all backed by SQLite.
 
-Current work is focused on **peer-to-peer sharing** (publishing collections as shared libraries, subscribing via ticket, browsing shared papers, and importing them locally). That area is present in the codebase but still evolving.
+Peer-to-peer library sharing (publish/subscribe/browse/import) is implemented and wired up, but still being refined for reliability and UX.
 
-Known limitations right now:
+Known limitations:
 
-- Search mode is still unfinished (`/` enters an unimplemented UI path)
-- P2P/library-sharing UX and reliability are still being refined
-- UX and data model are still evolving
+- Search mode is unfinished (`/` enters an unimplemented UI path)
+- The GUI crate (`minastirith-gui`) is an early scaffold, not yet usable
+- P2P sharing UX and reliability are still evolving

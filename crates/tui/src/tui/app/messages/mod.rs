@@ -30,7 +30,7 @@ impl App {
         let (saved, was_update) = self.metadata_component.core_mut().on_save_result(outcome);
         if saved {
             self.items_component
-                .refresh(self.collection_component.selected().map(|c| c.id))
+                .refresh(self.collection_component.selected())
                 .await?;
         } else {
             let title = match was_update {

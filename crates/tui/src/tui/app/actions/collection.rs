@@ -37,8 +37,8 @@ impl App {
 
     pub async fn confirm_collection_selection(&mut self) -> Result<()> {
         self.collection_component.core_mut().confirm_selection();
-        let collection_id = self.collection_component.selected().map(|c| c.id);
-        self.items_component.refresh(collection_id).await?;
+        let collection = self.collection_component.selected();
+        self.items_component.refresh(collection).await?;
         Ok(())
     }
 
@@ -136,8 +136,8 @@ impl App {
             .confirm_assign()
             .await?;
         self.mode = Mode::Normal;
-        let collection_id = self.collection_component.selected().map(|c| c.id);
-        self.items_component.refresh(collection_id).await?;
+        let collection = self.collection_component.selected();
+        self.items_component.refresh(collection).await?;
         Ok(())
     }
 }

@@ -6,6 +6,7 @@ static MIGRATOR: Migrator = sqlx::migrate!();
 
 pub mod collections;
 pub mod items;
+pub mod query;
 pub mod shared;
 pub mod tags;
 

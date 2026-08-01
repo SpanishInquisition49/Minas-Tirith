@@ -1,14 +1,18 @@
 use std::collections::HashMap;
 
-use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use cli_clipboard::ClipboardProvider;
 use color_eyre::eyre::Result;
+use minastirith_core::{
+    database::query::ast::{Expr, Field, Op, Value},
+    schema::collection::Collection,
+};
 use ratatui_notifications::Level;
 
 use crate::tui::app::App;
 
 impl App {
     pub async fn bulk_bibtex_to_system_clipboard(&mut self) -> Result<()> {
-        let Some(id) = self.collection_component.selected().map(|c| c.id) else {
+        let Some(collection) = self.collection_component.selected() else {
             self.notify(
                 "No selected collection",
                 " Bulk Export citation ".to_string(),
@@ -17,7 +21,12 @@ impl App {
             return Ok(());
         };
 
-        let items = self.archive.get_items(None, Some(id)).await?;
+        let filter = (!Collection::is_trivial_collection(collection.id)).then(|| Expr::Compare {
+            field: Field::Collection,
+            op: Op::Eq,
+            value: Value::Single(collection.name.clone()),
+        });
+        let items = self.archive.get_items(filter.as_ref()).await?;
 
         // NOTE: to handle possible cite keys overlap we keep track of the used keys
         // and append to conflicting keys their version (an incremental counter)
@@ -81,22 +90,24 @@ impl App {
     }
 
     fn send_to_sys_clipboard(&mut self, title: String, body: String, clipboard_content: String) {
-        match ClipboardContext::new() {
-            Ok(mut ctx) => match ctx.set_contents(clipboard_content) {
-                Ok(()) => {
-                    self.notify(body, title, Level::Info);
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "Could not set contents of the system clipboard")
-                }
-            },
+        let Some(ctx) = self.clipboard.as_mut() else {
+            tracing::error!("No system clipboard available");
+            self.notify(
+                "Clipboard unavailable",
+                " Export citation ".to_string(),
+                Level::Error,
+            );
+            return;
+        };
+        match ctx.set_contents(clipboard_content) {
+            Ok(()) => self.notify(body, title, Level::Info),
             Err(e) => {
-                tracing::error!(error = %e, "Could not get system clipboard");
+                tracing::error!(error = %e, "Could not set contents of the system clipboard");
                 self.notify(
-                    "Clipboard unavailable",
-                    " Export citation ".to_string(),
+                    "Could not set clipboard contents",
+                    title,
                     Level::Error,
-                )
+                );
             }
         }
     }

@@ -1,16 +1,22 @@
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
+use crossterm::event::Event;
 use minastirith_core::{
-    database::Archive, schema::item::DatabaseItem, state::item::ItemState, traits::Selectable,
+    database::Archive,
+    schema::{collection::Collection, item::DatabaseItem},
+    state::item::ItemState,
+    traits::Selectable,
 };
 use ratatui::widgets::ListState;
+use tui_input::{Input, backend::crossterm::EventHandler};
 
 use crate::traits::SelectableSync;
 
 pub struct ItemComponent {
     core: ItemState,
     list_state: ListState,
+    search_input: Input,
 }
 
 impl ItemComponent {
@@ -18,11 +24,12 @@ impl ItemComponent {
         Self {
             core: ItemState::new(archive),
             list_state: ListState::default(),
+            search_input: Input::default(),
         }
     }
 
-    pub async fn refresh(&mut self, collection_id: Option<i32>) -> Result<()> {
-        self.core.refresh(collection_id).await?;
+    pub async fn refresh(&mut self, collection: Option<&Collection>) -> Result<()> {
+        self.core.refresh(collection).await?;
         self.sync();
         Ok(())
     }
@@ -45,6 +52,33 @@ impl ItemComponent {
 
     pub fn list_state_mut(&mut self) -> &mut ListState {
         &mut self.list_state
+    }
+
+    pub fn search_input(&self) -> &Input {
+        &self.search_input
+    }
+
+    pub fn search_input_mut(&mut self) -> &mut Input {
+        &mut self.search_input
+    }
+
+    pub fn handle_search_event(&mut self, event: &Event) {
+        self.search_input.handle_event(event);
+    }
+
+    /// Parse the current search input and apply it.
+    /// The error is returned on parse failure so the caller can surface it.
+    pub async fn confirm_search(&mut self, collection: Option<&Collection>) -> Result<bool> {
+        let raw = self.search_input.value();
+        let applied = self.core.set_search(raw)?;
+        self.refresh(collection).await?;
+        Ok(applied)
+    }
+
+    pub fn cancel_search(&mut self) -> Result<()> {
+        self.core_mut().set_search("")?;
+        self.search_input.reset();
+        Ok(())
     }
 }
 

@@ -17,7 +17,7 @@ use ratatui::{
     style::{Modifier, Style, Stylize},
     symbols::{self, border},
     text::Line,
-    widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Tabs},
+    widgets::{Block, Borders, Clear, FrameExt, List, ListItem, Padding, Paragraph, Tabs},
 };
 use ratatui_explorer::Theme;
 
@@ -39,10 +39,15 @@ use crate::tui::{
 };
 
 pub fn draw(f: &mut Frame, app: &mut App) {
+    let screen = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Max(3), Constraint::Fill(3)])
+        .split(f.area());
+
     let main = Layout::default()
         .direction(Horizontal)
         .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
-        .split(f.area());
+        .split(screen[1]);
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
@@ -71,10 +76,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     draw_collection_sidebar(f, app, rows[0]);
     draw_list(f, app, rows[1]);
     draw_details(f, app, main[1]);
+    draw_search_bar(f, app, screen[0]);
     match app.mode() {
         Mode::Normal => {}                      // NO additional rendering
         Mode::Insert => draw_add_popup(f, app), // Add item popup
-        Mode::Search => {}                      // TODO: add the search feature
+        Mode::Search => {} // search bar is always rendered full-width below, nothing to overlay
         Mode::MetadataSelect => draw_metadata_select_popup(f, app),
         Mode::MetadataEdit => draw_metadata_edit_popup(f, app),
         Mode::CollectionCreate => draw_collection_create_popup(f, app),
@@ -96,6 +102,38 @@ fn draw_add_popup(f: &mut Frame, app: &mut App) {
     f.render_widget_ref(app.file_explorer().widget(), center);
 }
 
+fn draw_search_bar(f: &mut Frame, app: &mut App, area: Rect) {
+    let searching = matches!(app.mode(), Mode::Search);
+    let (text_style, border_style) = if searching {
+        (Style::default().white(), Style::default().green())
+    } else {
+        (Style::default().dim(), Style::default().blue())
+    };
+
+    let search_input = app.item_search_input_mut();
+
+    if searching {
+        let width = area.width.max(3) - 3;
+        let scroll = search_input.visual_scroll(width as usize);
+        let x = search_input.visual_cursor().max(scroll) - scroll + 1;
+        f.set_cursor_position((area.x + x as u16, area.y + 1))
+    }
+
+    let search_text = if app.item_search_input().value().is_empty() && !searching {
+        "/ search..."
+    } else {
+        app.item_search_input().value()
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_set(border::THICK)
+        .border_style(border_style)
+        .title(" Search ".italic().bold().yellow());
+    let value = Paragraph::new(search_text).block(block).style(text_style);
+    f.render_widget(value, area);
+}
+
 fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
@@ -107,6 +145,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         .select(app.selected_tab())
         .divider(symbols::DOT)
         .padding(" ", " ");
+
     let items: Vec<ListItem> = app
         .items()
         .iter()
@@ -135,6 +174,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         )
         .highlight_style(Style::default().green());
 
+    // NOTE: the list must be rendered first, and the tabs after
     f.render_stateful_widget(
         list,
         rows[1] + Offset::new(0, -1),

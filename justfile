@@ -3,8 +3,11 @@ set dotenv-load
 
 windows_target := "x86_64-pc-windows-msvc"
 
-run:
-  cargo run
+run-tui:
+  cargo run --bin minastirith
+
+run-gui:
+  cargo run --bin minastirith-app
 
 build:
   cargo build --release

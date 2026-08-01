@@ -1,5 +1,6 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
+use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use color_eyre::{Result, eyre::bail};
 use directories::ProjectDirs;
 use minastirith_core::{
@@ -79,6 +80,11 @@ pub struct App {
     pub(in crate::tui::app) quit: bool,
     pub(in crate::tui::app) file_explorer: FileExplorer,
     pub(in crate::tui::app) tick_counter: usize,
+    // NOTE: must stay alive for the lifetime of the app — on X11 the
+    // clipboard is only served to other apps while this context's
+    // background thread is running; a short-lived context loses ownership
+    // of the selection the instant it's dropped, so pasted content is gone.
+    pub(in crate::tui::app) clipboard: Option<ClipboardContext>,
 
     pub(in crate::tui::app) metadata_component: MetadataComponent,
     pub(in crate::tui::app) items_component: ItemComponent,
@@ -134,6 +140,7 @@ impl App {
             quit: false,
             file_explorer: Self::build_explorer(None)?,
             tick_counter: 0,
+            clipboard: ClipboardContext::new().ok(),
             items_component: ItemComponent::new(archive.clone()),
             metadata_component: MetadataComponent::new(
                 archive.clone(),

@@ -1,6 +1,8 @@
 use color_eyre::Result;
 use minastirith_core::{schema::item::DatabaseItem, traits::Selectable};
 use ratatui::widgets::ListState;
+use ratatui_notifications::Level;
+use tui_input::Input;
 
 use crate::{
     traits::SelectableSync,
@@ -43,24 +45,63 @@ impl App {
 
     pub async fn next_tab(&mut self) -> Result<()> {
         self.items_component.core_mut().tabs_next();
-        let collection_id = self.collection_component.selected().map(|c| c.id);
-        self.items_component.refresh(collection_id).await
+        let collection = self.collection_component.selected();
+        self.items_component.refresh(collection).await
     }
 
     pub async fn prev_tab(&mut self) -> Result<()> {
         self.items_component.core_mut().tabs_prev();
-        let collection_id = self.collection_component.selected().map(|c| c.id);
-        self.items_component.refresh(collection_id).await
+        let collection = self.collection_component.selected();
+        self.items_component.refresh(collection).await
     }
 
     pub fn item_list_state_mut(&mut self) -> &mut ListState {
         self.items_component.list_state_mut()
     }
 
+    pub fn item_search_input(&self) -> &Input {
+        self.items_component.search_input()
+    }
+
+    pub fn item_search_input_mut(&mut self) -> &mut Input {
+        self.items_component.search_input_mut()
+    }
+
     pub fn request_open_file_picker(&mut self) -> Result<()> {
         let cwd = self.file_explorer.cwd();
         self.file_explorer = Self::build_explorer(Some(cwd))?;
         self.mode = Mode::Insert;
+        Ok(())
+    }
+
+    pub fn open_search(&mut self) {
+        self.mode = Mode::Search;
+    }
+
+    pub async fn confirm_search(&mut self) -> Result<()> {
+        let collection = self.collection_component.selected();
+        match self.items_component.confirm_search(collection).await {
+            Ok(applied) => {
+                if applied {
+                    self.collection_component
+                        .core_mut()
+                        .selected_index_mut()
+                        .replace(0);
+                    self.collection_component.sync();
+                }
+                self.mode = Mode::Normal;
+            }
+            Err(e) => self.notify(e.to_string(), " Search ".to_string(), Level::Error),
+        }
+        Ok(())
+    }
+
+    pub async fn cancel_search(&mut self) -> Result<()> {
+        self.mode = Mode::Normal;
+        self.items_component.cancel_search()?;
+        self.items_component
+            .refresh(self.collection_component.selected())
+            .await?;
         Ok(())
     }
 }

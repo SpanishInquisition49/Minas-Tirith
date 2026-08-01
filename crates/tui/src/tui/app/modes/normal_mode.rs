@@ -2,7 +2,7 @@ use color_eyre::eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use minastirith_core::traits::Focusable;
 
-use crate::tui::app::{App, Focus, Mode};
+use crate::tui::app::{App, Focus};
 
 impl App {
     pub(in crate::tui::app::modes) async fn handle_normal_mode(
@@ -32,7 +32,7 @@ impl App {
                 KeyCode::Char('b') => self.send_bibtex_to_system_clipboard(),
                 KeyCode::Char('c') => self.open_collection_assign_for_selected(),
                 KeyCode::Char('L') => self.open_library_browse(),
-                KeyCode::Char('/') => self.mode = Mode::Search,
+                KeyCode::Char('/') => self.open_search(),
                 _ => {}
             },
             Focus::Collections => match key.code {

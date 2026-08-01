@@ -25,6 +25,9 @@ impl App {
         if let Mode::CollectionCreate = self.mode {
             self.collection_component.handle_event(&event);
         }
+        if let Mode::Search = self.mode {
+            self.items_component.handle_search_event(&event);
+        }
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Press
         {
@@ -44,7 +47,7 @@ impl App {
             Mode::Normal => self.handle_normal_mode(key).await?,
             Mode::Insert => self.handle_insert_mode(key),
             Mode::MetadataSelect => self.handle_metadata_select_mode(key),
-            Mode::Search => self.handle_search_mode(key),
+            Mode::Search => self.handle_search_mode(key).await?,
             Mode::MetadataEdit => self.handle_metadata_editing_mode(key).await?,
             Mode::CollectionCreate => self.handle_collection_create_mode(key).await?,
             Mode::CollectionAssign => self.handle_collection_assign_mode(key).await?,

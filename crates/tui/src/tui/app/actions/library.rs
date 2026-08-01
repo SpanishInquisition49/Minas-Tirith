@@ -3,6 +3,7 @@ use ratatui_notifications::Level;
 use std::path::PathBuf;
 
 use minastirith_core::{
+    database::query::ast::{Expr, Field, Op, Value},
     metadata::shared_library::{LibrarySubscription, SharedLibrary},
     peer2peer::library::SharedItemEntry,
     schema::collection::Collection,
@@ -88,12 +89,43 @@ impl App {
 
     pub fn open_library_browse(&mut self) {
         self.library_component.core_mut().open_browse();
+        self.sync_browse_selection();
         self.mode = Mode::LibraryBrowse;
     }
 
     pub fn open_library_manage(&mut self) {
         self.library_component.core_mut().open_manage();
+        self.sync_manage_selection();
         self.mode = Mode::LibraryManage;
+    }
+
+    /// Push the browse state's current indices into the `ListState`s that
+    /// actually drive the highlighted row — `browse_select_next`/`prev`
+    /// only update the core index, they don't touch rendering state.
+    pub fn sync_browse_selection(&mut self) {
+        let (sub_index, item_index) = match self.library_component.core().get_browse_state() {
+            Some(b) => (b.selected_subscriptions_index(), b.selected_item_index()),
+            None => (None, None),
+        };
+        self.library_component
+            .subscription_list_state_mut()
+            .select(sub_index);
+        self.library_component
+            .browse_list_state_mut()
+            .select(item_index);
+    }
+
+    /// Same as `sync_browse_selection`, for the manage-libraries list.
+    pub fn sync_manage_selection(&mut self) {
+        let index = self
+            .library_component
+            .core()
+            .get_manage_state()
+            .as_ref()
+            .and_then(|m| m.selected_library_index());
+        self.library_component
+            .manage_list_state_mut()
+            .select(index);
     }
 
     pub fn handle_item_download_ready(&mut self, entry: SharedItemEntry, local_path: PathBuf) {
@@ -153,8 +185,9 @@ impl App {
         if let Some(browse) = self.library_component.core_mut().get_browse_state_mut() {
             *browse.selected_subscriptions_index_mut() =
                 if len == 0 { None } else { Some(i.min(len - 1)) };
-            *self.library_component.browse_list_state_mut() = ListState::default();
+            *browse.selected_item_index_mut() = None;
         }
+        self.sync_browse_selection();
 
         self.notify(
             "Subscription removed",
@@ -216,7 +249,12 @@ impl App {
         } else {
             Some(description)
         };
-        let items_in_collection = self.archive.get_items(None, Some(collection.id)).await?;
+        let filter = (!Collection::is_trivial_collection(collection.id)).then(|| Expr::Compare {
+            field: Field::Collection,
+            op: Op::Eq,
+            value: Value::Single(collection.name.clone()),
+        });
+        let items_in_collection = self.archive.get_items(filter.as_ref()).await?;
 
         if let Some(name) = self
             .library_component

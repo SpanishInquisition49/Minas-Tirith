@@ -5,51 +5,39 @@ use color_eyre::{
     eyre::{Context, bail},
 };
 use slug::slugify;
-use sqlx::{Row, sqlite::SqliteRow};
+use sqlx::{QueryBuilder, Row, Sqlite, sqlite::SqliteRow};
 
 use crate::{
-    database::Archive,
-    metadata::common_metadata::{ItemMetadata, ItemType},
-    schema::{
-        collection::Collection,
-        item::{DatabaseItem, RawItemRow},
+    database::{
+        Archive,
+        query::{ast::Expr, sql::push_expr},
     },
+    metadata::common_metadata::ItemMetadata,
+    schema::item::{DatabaseItem, RawItemRow},
 };
 
 impl Archive {
-    pub async fn get_items(
-        &self,
-        item_type: Option<ItemType>,
-        collection_id: Option<i32>,
-    ) -> Result<Vec<DatabaseItem>> {
-        let collection_id = match collection_id {
-            Some(id) if !Collection::is_trivial_collection(id) => Some(id),
-            _ => None,
-        };
-        let items: Vec<RawItemRow> = sqlx::query_as(
+    pub async fn get_items(&self, filter: Option<&Expr>) -> Result<Vec<DatabaseItem>> {
+        let mut builder = QueryBuilder::<Sqlite>::new(
             "
 SELECT i.*, c.collections, a.authors, t.tags
 FROM items AS i
 LEFT JOIN view_collections_aggregated AS c ON c.item_id = i.id
 LEFT JOIN view_authors_aggregated AS a ON a.item_id = i.id
 LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id
-WHERE i.type = COALESCE(?, i.type)
-AND (
-    ? IS NULL
-    OR EXISTS(
-        SELECT 1
-        FROM json_each(c.collections) AS je
-        WHERE json_extract(je.value, '$.id') = ?)
-    )
-ORDER BY i.title
 ",
-        )
-        .bind(item_type.map(|i| i.to_string()))
-        .bind(collection_id)
-        .bind(collection_id)
-        .fetch_all(&self.pool)
-        .await
-        .context("Fetching Items")?;
+        );
+        if let Some(expr) = filter {
+            builder.push(" WHERE ");
+            push_expr(&mut builder, expr);
+        }
+        builder.push(" ORDER BY i.title");
+
+        let items: Vec<RawItemRow> = builder
+            .build_query_as()
+            .fetch_all(&self.pool)
+            .await
+            .context("Fetching items")?;
         Ok(items.into_iter().map(DatabaseItem::from).collect())
     }
 

@@ -16,10 +16,12 @@ impl App {
                 }
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                self.library_component.core_mut().browse_select_next()
+                self.library_component.core_mut().browse_select_next();
+                self.sync_browse_selection();
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                self.library_component.core_mut().browse_select_prev()
+                self.library_component.core_mut().browse_select_prev();
+                self.sync_browse_selection();
             }
             KeyCode::Char('r') => self.library_component.core_mut().refresh_current().await?,
             KeyCode::Char('d') => self.unsubscribe_selected_library().await?,
@@ -44,9 +46,11 @@ impl App {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
                 self.library_component.core_mut().manage_select_next();
+                self.sync_manage_selection();
             }
             KeyCode::Char('k') | KeyCode::Up => {
                 self.library_component.core_mut().manage_select_prev();
+                self.sync_manage_selection();
             }
             KeyCode::Char('t') => {
                 self.library_component
