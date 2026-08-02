@@ -19,32 +19,45 @@ pub struct LibraryBrowseState {
 }
 
 impl LibraryBrowseState {
+    /// Index of the currently highlighted subscription row.
+    #[must_use]
     pub fn selected_subscriptions_index(&self) -> Option<usize> {
         self.selected_subscriptions_index
     }
 
+    /// Index of the currently highlighted item row.
+    #[must_use]
     pub fn selected_item_index(&self) -> Option<usize> {
         self.selected_item_index
     }
 
+    /// Mutable access to the currently highlighted subscription row index.
     pub fn selected_subscriptions_index_mut(&mut self) -> &mut Option<usize> {
         &mut self.selected_subscriptions_index
     }
 
+    /// Mutable access to the currently highlighted item row index.
     pub fn selected_item_index_mut(&mut self) -> &mut Option<usize> {
         &mut self.selected_item_index
     }
 }
 
 impl LibraryState {
-    pub fn get_browse_state(&self) -> &Option<LibraryBrowseState> {
-        &self.browse
+    /// The active browse state, if the browse view is open.
+    #[must_use]
+    pub fn get_browse_state(&self) -> Option<&LibraryBrowseState> {
+        self.browse.as_ref()
     }
 
+    /// Mutable access to the active browse state, if the browse view is
+    /// open.
     pub fn get_browse_state_mut(&mut self) -> &mut Option<LibraryBrowseState> {
         &mut self.browse
     }
 
+    /// Namespace id of the subscription currently highlighted in the
+    /// browse view, if any.
+    #[must_use]
     pub fn current_namespace(&self) -> Option<&str> {
         let s = self.browse.as_ref()?;
         let i = s.selected_subscriptions_index?;
@@ -53,7 +66,9 @@ impl LibraryState {
             .map(|sub| sub.namespace_id.as_str())
     }
 
-    /// Refresh the item for the selected namespace in the browse list
+    /// Refresh the items for the selected namespace in the browse list
+    /// # Errors
+    /// Returns an error if fetching items from the shared library fails.
     pub async fn refresh_current(&mut self) -> Result<()> {
         let Some(namespace) = self.current_namespace().map(str::to_string) else {
             return Ok(());
@@ -67,6 +82,7 @@ impl LibraryState {
         Ok(())
     }
 
+    /// Open the browse view, selecting the first subscription if any exist.
     pub fn open_browse(&mut self) {
         let mut browse = LibraryBrowseState::default();
         if !self.subscriptions.is_empty() {
@@ -75,15 +91,21 @@ impl LibraryState {
         self.browse = Some(browse);
     }
 
+    /// Close the browse view.
     pub fn close_browse(&mut self) {
         self.browse = None;
     }
 
+    /// Move the browse highlight to the next row in the focused pane,
+    /// wrapping around. No-op if the browse view isn't open.
     pub fn browse_select_next(&mut self) {
         let Some(namespace) = self.current_namespace() else {
             return;
         };
-        let items_len = self.browsed_items.get(namespace).map_or(0, |v| v.len());
+        let items_len = self
+            .browsed_items
+            .get(namespace)
+            .map_or(0, std::vec::Vec::len);
         let Some(browse) = &mut self.browse else {
             return;
         };
@@ -115,11 +137,16 @@ impl LibraryState {
         }
     }
 
+    /// Move the browse highlight to the previous row in the focused pane,
+    /// wrapping around. No-op if the browse view isn't open.
     pub fn browse_select_prev(&mut self) {
         let Some(namespace) = self.current_namespace() else {
             return;
         };
-        let items_len = self.browsed_items.get(namespace).map_or(0, |v| v.len());
+        let items_len = self
+            .browsed_items
+            .get(namespace)
+            .map_or(0, std::vec::Vec::len);
         let Some(browse) = &mut self.browse else {
             return;
         };
@@ -151,6 +178,8 @@ impl LibraryState {
         }
     }
 
+    /// Import the currently highlighted item in the browse view. No-op
+    /// unless the items pane is focused and an item is highlighted.
     pub fn browse_confirm_import(&mut self) {
         let Some(browse) = &self.browse else {
             return;
@@ -170,8 +199,7 @@ impl LibraryState {
         let Some(entry) = self
             .browsed_items
             .get(current_namespace)
-            .map(|vec| vec.get(i).cloned())
-            .unwrap_or(None)
+            .and_then(|vec| vec.get(i).cloned())
         else {
             return;
         };

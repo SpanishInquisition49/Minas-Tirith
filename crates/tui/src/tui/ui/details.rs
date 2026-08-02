@@ -1,4 +1,4 @@
-use minastirith_core::metadata::common_metadata::ItemType;
+use minastirith_core::{metadata::common_metadata::ItemType, schema::item::DatabaseItem};
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
@@ -11,24 +11,10 @@ use ratatui_image::StatefulImage;
 
 use crate::{traits::Spannable, tui::app::App};
 
+/// Render the selected item's details panel.
 pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     let title = Line::from(" Details ".yellow().bold().italic());
-    let instructions = Line::from(vec![
-        " Navigate: ".yellow(),
-        "<j/k>".green().bold(),
-        " Search: ".yellow(),
-        "</>".green().bold(),
-        " Add Tome: ".yellow(),
-        "<a>".green().bold(),
-        " Edit Tome: ".yellow(),
-        "<e>".green().bold(),
-        " Export Bibtex: ".yellow(),
-        "<b>".green().bold(),
-        " Focus: ".yellow(),
-        "<Tab>".green().bold(),
-        " Quit: ".yellow(),
-        "<q> ".green().bold(),
-    ]);
+    let instructions = instructions();
     let mut block = Block::default()
         .borders(Borders::ALL)
         .border_set(border::THICK)
@@ -52,9 +38,17 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         .spacing(2)
         .split(inner);
 
+    let text_width = cols[1].width;
+    let card = build_details_card(item, text_width);
+
+    let has_cover_url = item.fields.cover_image_url.is_some();
+    f.render_widget(Paragraph::new(card), cols[1]);
+    draw_cover(has_cover_url, f, app, cols[0]);
+}
+
+fn build_details_card(item: &DatabaseItem, text_width: u16) -> Vec<Line<'_>> {
     let item_type = ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::default());
     let titles_style = Style::new().bold().dark_gray();
-    let text_width = cols[1].width;
     let mut card = vec![];
     card.push(Line::from("Authors:\n".bold().style(titles_style)));
     let authors_pills: Vec<(usize, Span<'_>)> = item
@@ -69,7 +63,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
     )));
     card.push(Line::from(vec![
         "Type: ".bold().style(titles_style),
-        item.fields.r#type.to_string().into(),
+        item.fields.r#type.clone().into(),
     ]));
     if let Some(container) = &item.fields.container {
         let name = match item_type {
@@ -139,9 +133,7 @@ pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
         titles_style,
     ));
 
-    let has_cover_url = item.fields.cover_image_url.is_some();
-    f.render_widget(Paragraph::new(card), cols[1]);
-    draw_cover(has_cover_url, f, app, cols[0]);
+    card
 }
 
 fn wrap_pills<'a>(pills: Vec<(usize, Span<'a>)>, max_width: u16) -> Vec<Line<'a>> {
@@ -219,21 +211,35 @@ fn wrap_labeled_field(
 }
 
 fn draw_cover(has_cover_url: bool, f: &mut Frame, app: &mut App, area: Rect) {
-    if !has_cover_url {
+    if has_cover_url {
+        if let Some(protocol) = app.selected_cover() {
+            // Resize::Fit(None) è già il default: preserva aspect ratio
+            f.render_stateful_widget(StatefulImage::default(), area, protocol);
+        } else {
+            let placeholder =
+                Paragraph::new("Loading…").alignment(ratatui::layout::Alignment::Center);
+            f.render_widget(placeholder, area);
+        }
+    } else {
         let placeholder =
             Paragraph::new(" \nNo cover").alignment(ratatui::layout::Alignment::Center);
         f.render_widget(placeholder, area);
-    } else {
-        match app.selected_cover() {
-            Some(protocol) => {
-                // Resize::Fit(None) è già il default: preserva aspect ratio
-                f.render_stateful_widget(StatefulImage::default(), area, protocol);
-            }
-            None => {
-                let placeholder =
-                    Paragraph::new("Loading…").alignment(ratatui::layout::Alignment::Center);
-                f.render_widget(placeholder, area);
-            }
-        }
     }
+}
+
+fn instructions<'a>() -> Line<'a> {
+    Line::from(vec![
+        " Navigate: ".yellow(),
+        "<j/k>".green().bold(),
+        " Add Tome: ".yellow(),
+        "<a>".green().bold(),
+        " Edit Tome: ".yellow(),
+        "<e>".green().bold(),
+        " Export Bibtex: ".yellow(),
+        "<b>".green().bold(),
+        " Focus: ".yellow(),
+        "<Tab>".green().bold(),
+        " Quit: ".yellow(),
+        "<q> ".green().bold(),
+    ])
 }

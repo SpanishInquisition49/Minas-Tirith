@@ -21,6 +21,8 @@ fn get_core_crate() -> proc_macro2::TokenStream {
     }
 }
 
+/// Derive `Cyclable` for a unit-only enum, cycling through variants in
+/// declaration order.
 #[proc_macro_derive(Cyclable)]
 pub fn derive_cyclable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -42,7 +44,7 @@ pub fn derive_cyclable(input: TokenStream) -> TokenStream {
     }
 
     let mut names = Vec::new();
-    for v in variants.iter() {
+    for v in &variants {
         if !matches!(v.fields, Fields::Unit) {
             return syn::Error::new_spanned(&v.ident, "Cyclable supports only unit variants")
                 .to_compile_error()
@@ -84,6 +86,8 @@ pub fn derive_cyclable(input: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+/// Derive `Focusable` for a struct, using the field named in
+/// `#[focus(field_name)]` as the focus value.
 #[proc_macro_derive(Focusable, attributes(focus))]
 pub fn derive_focusable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -94,13 +98,10 @@ pub fn derive_focusable(input: TokenStream) -> TokenStream {
         Err(e) => return e.to_compile_error().into(),
     };
 
-    let field_name = match focus_field {
-        Some(name) => name,
-        None => {
-            return syn::Error::new_spanned(&ident, r#"Missing attribute: #[focus(field_name)]"#)
-                .to_compile_error()
-                .into();
-        }
+    let Some(field_name) = focus_field else {
+        return syn::Error::new_spanned(&ident, r"Missing attribute: #[focus(field_name)]")
+            .to_compile_error()
+            .into();
     };
 
     let fields = match input.data {
@@ -181,6 +182,8 @@ fn find_single_attr_name(
     Ok(found)
 }
 
+/// Derive `Selectable` for a struct, using the fields named in
+/// `#[select(items_field, selected_index_field)]`.
 #[proc_macro_derive(Selectable, attributes(select))]
 pub fn derive_selectable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

@@ -1,5 +1,6 @@
 use core::fmt;
 use std::borrow::Cow;
+use std::fmt::Write;
 
 use human_name::Name;
 use serde::Deserialize;
@@ -57,15 +58,19 @@ impl From<RawItemRow> for DatabaseItem {
 impl fmt::Display for DatabaseItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
-        str.push_str(&format!("Id: {}\n", self.id));
-        str.push_str(&format!("{}", self.fields));
-        str.push_str(&format!("Created At: {}\n", self.created_at));
-        str.push_str(&format!("Updated At: {}\n", self.updated_at));
+        let _ = writeln!(str, "Id: {}", self.id);
+        let _ = write!(str, "{}", self.fields);
+        let _ = writeln!(str, "Created At: {}", self.created_at);
+        let _ = writeln!(str, "Updated At: {}", self.updated_at);
         write!(f, "{str}")
     }
 }
 
 impl DatabaseItem {
+    /// Render this item as a BibTeX entry, using `override_key` as the
+    /// cite key if given, otherwise deriving one from the author and
+    /// publication year.
+    #[must_use]
     pub fn to_bibtex(&self, override_key: Option<String>) -> String {
         let item_type =
             ItemType::try_from(self.fields.r#type.as_str()).unwrap_or(ItemType::default());
@@ -120,7 +125,7 @@ impl DatabaseItem {
         let mut bibtex = format!("@{entry_type}{{{key},\n");
         for (name, value) in fields {
             if let Some(v) = value {
-                bibtex.push_str(&format!("\t{name} = {{{v}}},\n"));
+                let _ = writeln!(bibtex, "\t{name} = {{{v}}},");
             }
         }
         bibtex.push_str("}\n");
@@ -167,6 +172,8 @@ impl DatabaseItem {
             .map(str::to_string)
     }
 
+    /// Derive a BibTeX cite key from the first author's surname and the
+    /// publication year, falling back to the item's title slug.
     pub fn cite_key(&self) -> String {
         let author_last_name = self
             .authors
@@ -254,23 +261,23 @@ pub struct Item {
 impl fmt::Display for Item {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut str = String::new();
-        str.push_str(&format!("Title: {}\n", self.title));
+        let _ = writeln!(str, "Title: {}", self.title);
         if let Some(desc) = &self.description {
-            str.push_str(&format!("Description:\n{desc}"));
+            let _ = write!(str, "Description:\n{desc}");
         }
-        str.push_str(&format!("Type: {}\n", self.r#type));
+        let _ = writeln!(str, "Type: {}", self.r#type);
         if let Some(doi) = &self.doi {
-            str.push_str(&format!("DOI: {doi}\n"));
+            let _ = writeln!(str, "DOI: {doi}");
         }
         if let Some(isbn) = &self.isbn {
-            str.push_str(&format!("ISBN: {isbn}\n"));
+            let _ = writeln!(str, "ISBN: {isbn}");
         }
         if let Some(date) = &self.publication_date {
-            str.push_str(&format!("Publication Date: {date}\n"));
+            let _ = writeln!(str, "Publication Date: {date}");
         }
-        str.push_str(&format!("Slug: {}\n", self.slug));
+        let _ = writeln!(str, "Slug: {}", self.slug);
         if let Some(url) = &self.cover_image_url {
-            str.push_str(&format!("Cover URL: {url}\n"));
+            let _ = writeln!(str, "Cover URL: {url}");
         }
 
         write!(f, "{str}")

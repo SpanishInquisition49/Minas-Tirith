@@ -10,6 +10,7 @@ use ratatui::{
 
 use crate::tui::app::App;
 
+/// Render the help popup.
 pub fn draw_help_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()
@@ -59,7 +60,8 @@ pub fn draw_help_popup(f: &mut Frame, app: &mut App) {
         })
         .sum();
 
-    let max_scroll = total_wrapped_lines.saturating_sub(inner.height as usize) as u16;
+    let max_scroll = u16::try_from(total_wrapped_lines.saturating_sub(inner.height as usize))
+        .unwrap_or(u16::MAX);
     app.set_help_scroll(max_scroll);
 
     let paragraph = Paragraph::new(lines)

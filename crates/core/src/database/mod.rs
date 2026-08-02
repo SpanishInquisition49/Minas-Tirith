@@ -16,10 +16,15 @@ pub struct Archive {
 }
 
 impl Archive {
+    /// Construct an [`Archive`] backed by an existing [`SqlitePool`].
+    #[must_use]
     pub fn from_pool(pool: SqlitePool) -> Self {
         Archive { pool }
     }
 
+    /// Run the migrations to align the database to the current standard used by the core.
+    /// # Errors
+    /// the function fail there is a failure while running migrations.
     pub async fn migrate(&self) -> Result<()> {
         MIGRATOR.run(&self.pool).await.context("Running Migrations")
     }

@@ -15,6 +15,7 @@ impl Field {
     /// Fields backed by a joined, aggregated relation rather
     /// than a plain column on `items`.
     /// These are the only fields where a list value (`field=[a,b]`) is meaningful for
+    #[must_use]
     pub fn is_multi_valued(&self) -> bool {
         matches!(self, Field::Author | Field::Collection | Field::Tag)
     }

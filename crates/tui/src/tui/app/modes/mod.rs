@@ -12,10 +12,15 @@ pub mod normal_mode;
 pub mod search_mode;
 
 impl App {
+    /// Route an input `event` to the currently active mode's handlers
+    /// (widget input, then the mode-specific key handler, then
+    /// dialog-focused input).
+    /// # Errors
+    /// Returns an error if the active mode's key handler fails.
     pub async fn handle(&mut self, event: Event) -> Result<()> {
         if let Mode::Insert = self.mode {
             self.file_explorer.handle(&event)?;
-        };
+        }
         if let Mode::MetadataEdit = self.mode
             && let Some(form) = &mut self.metadata_component.core_mut().form_mut()
             && form.editing
@@ -48,7 +53,7 @@ impl App {
             Mode::Insert => self.handle_insert_mode(key),
             Mode::MetadataSelect => self.handle_metadata_select_mode(key),
             Mode::Search => self.handle_search_mode(key).await?,
-            Mode::MetadataEdit => self.handle_metadata_editing_mode(key).await?,
+            Mode::MetadataEdit => self.handle_metadata_editing_mode(key),
             Mode::CollectionCreate => self.handle_collection_create_mode(key).await?,
             Mode::CollectionAssign => self.handle_collection_assign_mode(key).await?,
             Mode::LibraryPublish => self.handle_library_publish_mode(key).await?,

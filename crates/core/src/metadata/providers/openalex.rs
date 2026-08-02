@@ -14,6 +14,9 @@ pub struct OpenAlexManager {}
 
 impl OpenAlexManager {
     const BASE_URL: &str = "https://api.openalex.org/works";
+
+    /// Construct an [`OpenAlexManager`].
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -72,9 +75,8 @@ impl MetadataFetcher for OpenAlexManager {
             && let Some(r#abstract) = item.reconstruct_abstract()
         {
             return Ok(Some(r#abstract));
-        } else {
-            Ok(None)
         }
+        Ok(None)
     }
 }
 

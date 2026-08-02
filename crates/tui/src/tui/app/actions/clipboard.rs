@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use cli_clipboard::ClipboardProvider;
 use color_eyre::eyre::Result;
@@ -11,6 +12,10 @@ use ratatui_notifications::Level;
 use crate::tui::app::App;
 
 impl App {
+    /// Export every item in the selected collection as BibTeX and copy it
+    /// to the system clipboard.
+    /// # Errors
+    /// Returns an error if fetching the collection's items fails.
     pub async fn bulk_bibtex_to_system_clipboard(&mut self) -> Result<()> {
         let Some(collection) = self.collection_component.selected() else {
             self.notify(
@@ -36,14 +41,14 @@ impl App {
             let cite_key = item.cite_key();
             let key = if key_version_map.contains_key(&cite_key) {
                 let version = key_version_map.get(&cite_key).copied().unwrap_or(1);
-                let key = format!("{}-{}", cite_key, version);
+                let key = format!("{cite_key}-{version}");
                 key_version_map.insert(cite_key, version + 1);
                 Some(key)
             } else {
                 key_version_map.insert(cite_key, 1);
                 None
             };
-            bibtex.push_str(&format!("{}\n", item.to_bibtex(key)));
+            let _ = writeln!(bibtex, "{}", item.to_bibtex(key));
         }
         self.send_to_sys_clipboard(
             " Export collection ".to_string(),
@@ -53,6 +58,8 @@ impl App {
         Ok(())
     }
 
+    /// Export the currently selected item as a BibTeX entry and copy it to
+    /// the system clipboard.
     pub fn send_bibtex_to_system_clipboard(&mut self) {
         let Some(item) = self.selected_item() else {
             self.notify(
@@ -71,6 +78,8 @@ impl App {
         );
     }
 
+    /// Copy the currently generated share ticket to the system clipboard,
+    /// if one exists.
     pub fn copy_current_ticket_to_clipboard(&mut self) {
         if let Some(manage) = self.library_component.core().get_manage_state()
             && let Some(ticket) = manage.current_ticket()
@@ -103,11 +112,7 @@ impl App {
             Ok(()) => self.notify(body, title, Level::Info),
             Err(e) => {
                 tracing::error!(error = %e, "Could not set contents of the system clipboard");
-                self.notify(
-                    "Could not set clipboard contents",
-                    title,
-                    Level::Error,
-                );
+                self.notify("Could not set clipboard contents", title, Level::Error);
             }
         }
     }

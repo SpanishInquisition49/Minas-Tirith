@@ -8,6 +8,10 @@ use crate::database::query::{
     lexer::QueryToken,
 };
 
+/// Try to parse a raw filter clause.
+/// # Errors
+/// if the given filter is not valid an error is returned
+/// explaining why the parsing failed.
 pub fn parse(input: &str) -> Result<Expr> {
     let tokens = tokenize(input)?;
     let mut parser = Parser {
@@ -26,7 +30,7 @@ fn tokenize(input: &str) -> Result<Vec<QueryToken>> {
     while let Some(result) = lexer.next() {
         match result {
             Ok(tok) => tokens.push(tok),
-            Err(_) => {
+            Err(()) => {
                 bail!(
                     "unexpected input {:?} at position {:?}",
                     lexer.slice(),
@@ -48,7 +52,7 @@ impl Parser {
         while matches!(self.tokens.peek(), Some(QueryToken::Or)) {
             self.tokens.next();
             let rhs = self.parse_and()?;
-            lhs = Expr::Or(Box::new(lhs), Box::new(rhs))
+            lhs = Expr::Or(Box::new(lhs), Box::new(rhs));
         }
         Ok(lhs)
     }
@@ -58,7 +62,7 @@ impl Parser {
         while matches!(self.tokens.peek(), Some(QueryToken::And)) {
             self.tokens.next();
             let rhs = self.parse_unary()?;
-            lhs = Expr::And(Box::new(lhs), Box::new(rhs))
+            lhs = Expr::And(Box::new(lhs), Box::new(rhs));
         }
         Ok(lhs)
     }
@@ -75,16 +79,16 @@ impl Parser {
         match self.tokens.next() {
             Some(QueryToken::LParen) => {
                 let expr = self.parse_or()?;
-                self.expect(QueryToken::RParen)?;
+                self.expect(&QueryToken::RParen)?;
                 Ok(expr)
             }
-            Some(tok) => self.parse_compare(tok),
+            Some(tok) => self.parse_compare(&tok),
             None => bail!("unexpected end of query"),
         }
     }
 
-    fn parse_compare(&mut self, field_tok: QueryToken) -> Result<Expr> {
-        let field = Self::token_to_field(&field_tok)
+    fn parse_compare(&mut self, field_tok: &QueryToken) -> Result<Expr> {
+        let field = Self::token_to_field(field_tok)
             .ok_or_else(|| eyre!("expected a field name, found {field_tok:?}"))?;
 
         let op = match self.tokens.next() {
@@ -115,7 +119,7 @@ impl Parser {
                 other => bail!("expected a value list, found {other:?}"),
             }
             match self.tokens.next() {
-                Some(QueryToken::Comma) => continue,
+                Some(QueryToken::Comma) => {}
                 Some(QueryToken::RSquare) => break,
                 other => bail!("expected ',' or ']' in list, found {other:?}"),
             }
@@ -123,9 +127,9 @@ impl Parser {
         Ok(items)
     }
 
-    fn expect(&mut self, expected: QueryToken) -> Result<()> {
+    fn expect(&mut self, expected: &QueryToken) -> Result<()> {
         match self.tokens.next() {
-            Some(tok) if tok == expected => Ok(()),
+            Some(tok) if tok == *expected => Ok(()),
             other => bail!("expected {expected:?}, found {other:?}"),
         }
     }

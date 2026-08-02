@@ -29,6 +29,9 @@ pub struct ItemState {
 }
 
 impl ItemState {
+    /// Construct an [`ItemState`] backed by `archive`, with no items loaded
+    /// and the "All" tab selected.
+    #[must_use]
     pub fn new(archive: Arc<Archive>) -> Self {
         Self {
             archive,
@@ -39,6 +42,7 @@ impl ItemState {
         }
     }
 
+    /// Mutable access to the currently loaded items.
     pub fn items_mut(&mut self) -> &mut [DatabaseItem] {
         self.items.as_mut_slice()
     }
@@ -47,7 +51,9 @@ impl ItemState {
     /// overriding tab/collection, whose selectors reset to "All"
     /// *Note:* resetting the collection sidebar is a UI-layer concern.
     /// An empty `raw` clears the search and falls back to tab/collection filtering.
-    /// Return `true` if the filter is applied, `false` otherwise
+    /// Return `true` if the filter is applied, `false` otherwise.
+    /// # Errors
+    /// The functions raise an error if the raw query is invalid.
     pub fn set_search(&mut self, raw: &str) -> Result<bool> {
         let raw = raw.trim();
         if raw.is_empty() {
@@ -88,6 +94,11 @@ impl ItemState {
         }
     }
 
+    /// Reload items from `archive` using the active search query, falling
+    /// back to the selected tab/collection filter. Selects the first item
+    /// if none was selected yet.
+    /// # Errors
+    /// Returns an error if fetching items from the archive fails.
     pub async fn refresh(&mut self, collection: Option<&Collection>) -> Result<()> {
         let filter = self.resolve_filter(collection);
         self.items = self.archive.get_items(filter.as_ref()).await?;
@@ -97,6 +108,7 @@ impl ItemState {
         Ok(())
     }
 
+    /// Select the previous tab, wrapping around to the last one.
     pub fn tabs_prev(&mut self) {
         self.selected_tab = if self.selected_tab == 0 {
             TABS_LABELS.len() - 1
@@ -105,6 +117,7 @@ impl ItemState {
         }
     }
 
+    /// Select the next tab, wrapping around to the first one.
     pub fn tabs_next(&mut self) {
         self.selected_tab = if self.selected_tab + 1 == TABS_LABELS.len() {
             0
@@ -113,18 +126,27 @@ impl ItemState {
         }
     }
 
+    /// Index of the currently selected tab.
+    #[must_use]
     pub fn selected_tab(&self) -> usize {
         self.selected_tab
     }
 
+    /// The currently selected item, if any.
+    #[must_use]
     pub fn selected_item(&self) -> Option<&DatabaseItem> {
         self.items.get(self.selected_item?)
     }
 
+    /// Mutable access to the currently selected item, if any.
     pub fn selected_item_mut(&mut self) -> Option<&mut DatabaseItem> {
         self.items.get_mut(self.selected_item?)
     }
 
+    /// Open the currently selected item's file with the system's default
+    /// application. No-op if no item is selected.
+    /// # Errors
+    /// Returns an error if the system fails to open the file.
     pub fn open_item(&self) -> Result<()> {
         let Some(item) = self.selected_item() else {
             return Ok(());

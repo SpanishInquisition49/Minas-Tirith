@@ -9,15 +9,13 @@ impl App {
         key: KeyEvent,
     ) -> Result<()> {
         match (key.modifiers, key.code) {
-            (_, KeyCode::Char('j')) | (_, KeyCode::Down) => self.collection_assign_next(),
-            (_, KeyCode::Char('k')) | (_, KeyCode::Up) => self.collection_assign_prev(),
-            (_, KeyCode::Char(' ')) | (_, KeyCode::Enter) => {
-                self.collection_assign_toggle_current()
-            }
+            (_, KeyCode::Char('j') | KeyCode::Down) => self.collection_assign_next(),
+            (_, KeyCode::Char('k') | KeyCode::Up) => self.collection_assign_prev(),
+            (_, KeyCode::Char(' ') | KeyCode::Enter) => self.collection_assign_toggle_current(),
             (KeyModifiers::CONTROL, KeyCode::Char('s')) => self.confirm_collection_assign().await?,
-            (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => self.cancel_collection_assign(),
+            (_, KeyCode::Esc | KeyCode::Char('q')) => self.cancel_collection_assign(),
             _ => {}
-        };
+        }
         Ok(())
     }
 
@@ -29,7 +27,7 @@ impl App {
             KeyCode::Enter => self.confirm_collection_create().await?,
             KeyCode::Esc => self.close_collection_create(),
             _ => {}
-        };
+        }
         Ok(())
     }
 }

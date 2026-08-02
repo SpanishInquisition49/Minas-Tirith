@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr};
 
-use color_eyre::eyre::Context;
+use color_eyre::eyre::{Context, ContextCompat, Result};
 use directories::ProjectDirs;
 use minastirith_core::{
     app_config::AppConfig, database::Archive, metadata::image_cache::ImageCache,
@@ -31,13 +31,19 @@ fn get_image_cache_path(proj_dirs: &ProjectDirs) -> PathBuf {
     cache_dir
 }
 
-pub async fn init_db(proj_dirs: &ProjectDirs) -> color_eyre::Result<SqlitePool> {
+/// Initialize the database connection.
+/// # Errors
+/// The functions raise an error when:
+/// - The database path is not an UTF-8 encoded string
+/// - A connection to the `Sqlite` database cannot been established
+/// # Panics
+pub async fn init_db(proj_dirs: &ProjectDirs) -> Result<SqlitePool> {
     let db_path = get_db_path(proj_dirs);
 
     let options = SqliteConnectOptions::from_str(
         db_path
             .to_str()
-            .expect("Database path should be UTF-8 encoded"),
+            .context("Database path should be UTF-8 encoded")?,
     )?
     .create_if_missing(true)
     .foreign_keys(true);
@@ -50,7 +56,10 @@ pub async fn init_db(proj_dirs: &ProjectDirs) -> color_eyre::Result<SqlitePool> 
     Ok(pool)
 }
 
-pub fn init(proj_dirs: &ProjectDirs) -> color_eyre::Result<WorkerGuard> {
+/// Initialize the tracing instumentation
+/// # Errors
+/// The function raise an error when the log directory cannot be created
+pub fn init(proj_dirs: &ProjectDirs) -> Result<WorkerGuard> {
     let log_dir = proj_dirs.data_dir().join("logs");
     std::fs::create_dir_all(&log_dir).context("Creating log directory")?;
 
@@ -68,7 +77,7 @@ pub fn init(proj_dirs: &ProjectDirs) -> color_eyre::Result<WorkerGuard> {
 }
 
 #[tokio::main]
-async fn main() -> color_eyre::Result<()> {
+async fn main() -> Result<()> {
     color_eyre::install()?;
     let proj_dirs = ProjectDirs::from("com", "TheSpanishInquisition", "minastirith")
         .expect("Cannot Enstablish Data directories");

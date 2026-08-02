@@ -20,6 +20,8 @@ pub struct ItemComponent {
 }
 
 impl ItemComponent {
+    /// Construct an [`ItemComponent`] backed by `archive`, with no items
+    /// loaded yet.
     pub fn new(archive: Arc<Archive>) -> Self {
         Self {
             core: ItemState::new(archive),
@@ -28,40 +30,51 @@ impl ItemComponent {
         }
     }
 
+    /// Reload the item list for `collection` and sync the list selection.
+    /// # Errors
+    /// Returns an error if fetching items fails.
     pub async fn refresh(&mut self, collection: Option<&Collection>) -> Result<()> {
         self.core.refresh(collection).await?;
         self.sync();
         Ok(())
     }
 
+    /// The underlying [`ItemState`].
     pub fn core(&self) -> &ItemState {
         &self.core
     }
 
+    /// Mutable access to the underlying [`ItemState`].
     pub fn core_mut(&mut self) -> &mut ItemState {
         &mut self.core
     }
 
+    /// All items currently loaded.
     pub fn items(&self) -> &[DatabaseItem] {
         self.core.items()
     }
 
+    /// Mutable access to the currently loaded items.
     pub fn items_mut(&mut self) -> &mut [DatabaseItem] {
         self.core.items_mut()
     }
 
+    /// Mutable access to the item list's ratatui `ListState`.
     pub fn list_state_mut(&mut self) -> &mut ListState {
         &mut self.list_state
     }
 
+    /// The item search input widget.
     pub fn search_input(&self) -> &Input {
         &self.search_input
     }
 
+    /// Mutable access to the item search input widget.
     pub fn search_input_mut(&mut self) -> &mut Input {
         &mut self.search_input
     }
 
+    /// Route `event` to the search input widget.
     pub fn handle_search_event(&mut self, event: &Event) {
         self.search_input.handle_event(event);
     }
@@ -75,6 +88,9 @@ impl ItemComponent {
         Ok(applied)
     }
 
+    /// Clear the active search and reset the search input.
+    /// # Errors
+    /// Returns an error if clearing the search filter fails.
     pub fn cancel_search(&mut self) -> Result<()> {
         self.core_mut().set_search("")?;
         self.search_input.reset();

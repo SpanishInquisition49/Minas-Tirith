@@ -12,6 +12,7 @@ use crate::{
     tui::{app::App, ui::source_tag::SourceTag},
 };
 
+/// Render the metadata candidate selection popup.
 pub fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()

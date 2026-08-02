@@ -17,6 +17,7 @@ use ratatui::{
 
 use crate::tui::app::App;
 
+/// Render the library publish popup.
 pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()
@@ -110,6 +111,7 @@ pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
     }
 }
 
+/// Render the library subscribe popup.
 pub fn draw_library_subscribe_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()
@@ -178,6 +180,7 @@ pub fn draw_library_subscribe_popup(f: &mut Frame, app: &mut App) {
     }
 }
 
+/// Render the library browse popup.
 pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()
@@ -272,6 +275,7 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
     f.render_stateful_widget(papers_list, cols[1], app.browse_list_state_mut());
 }
 
+/// Render the manage-libraries popup.
 pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()

@@ -25,6 +25,10 @@ pub struct ShareNode {
 
 impl ShareNode {
     /// Bind the `ShareNode` endpoint and add the address lookup
+    /// # Errors
+    /// Returns an error if the endpoint cannot be bound, the mDNS lookup
+    /// cannot be built, the blobs store cannot be created/loaded, or the
+    /// docs protocol cannot be spawned.
     pub async fn bind(data_dir: &Path) -> Result<Self> {
         let secret_key = load_or_create_secret_key(data_dir)?;
         let endpoint = Endpoint::builder(presets::N0)

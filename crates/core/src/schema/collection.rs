@@ -13,6 +13,7 @@ impl Colorable for Collection {}
 
 impl Collection {
     /// Get the All collection
+    #[must_use]
     pub fn trivial_collection() -> Self {
         Self {
             id: -1,
@@ -22,6 +23,7 @@ impl Collection {
     }
 
     /// Check if the given id is from the trivial collection
+    #[must_use]
     pub fn is_trivial_collection(id: i32) -> bool {
         id == -1
     }

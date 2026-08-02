@@ -17,6 +17,10 @@ use crate::{
 };
 
 impl Archive {
+    /// Fetch all items matching `filter`, joined with their collections,
+    /// authors and tags, ordered by title. Pass `None` to fetch every item.
+    /// # Errors
+    /// Returns an error if the query fails.
     pub async fn get_items(&self, filter: Option<&Expr>) -> Result<Vec<DatabaseItem>> {
         let mut builder = QueryBuilder::<Sqlite>::new(
             "
@@ -41,6 +45,9 @@ LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id
         Ok(items.into_iter().map(DatabaseItem::from).collect())
     }
 
+    /// Set the cover image URL for the item identified by `item_id`.
+    /// # Errors
+    /// Returns an error if the update query fails.
     pub async fn set_cover_image_url(&self, item_id: i32, cover_url: &str) -> Result<()> {
         sqlx::query("UPDATE items SET cover_image_url = ? WHERE id = ?;")
             .bind(cover_url)
@@ -51,6 +58,12 @@ LEFT JOIN view_tags_aggregated AS t ON t.item_id = i.id
         Ok(())
     }
 
+    /// Insert a new item, its authors and tags from `form`, storing `item_path`
+    /// as its on-disk location. Runs in a transaction that is rolled back on
+    /// failure.
+    /// # Errors
+    /// Returns an error if inserting the item, its authors, or its tags fails,
+    /// or if the transaction cannot be committed.
     pub async fn save_item_from_form<T: ItemMetadata + ?Sized>(
         &self,
         form: &T,
@@ -98,6 +111,7 @@ RETURNING id
         };
 
         for (index, author) in form.authors_structured().iter().enumerate() {
+            let index = i32::try_from(index)?;
             let row: SqliteRow = sqlx::query(
                 "
 INSERT INTO authors (name, slug, given_name, family_name)
@@ -123,7 +137,7 @@ VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
             )
             .bind(item_id)
             .bind(author_id)
-            .bind(index as i32)
+            .bind(index)
             .execute(&mut *txn)
             .await
             .context("Linking item-author")?;
@@ -136,6 +150,12 @@ VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
         Ok(())
     }
 
+    /// Update the item identified by `item_id` with the values from `form`,
+    /// replacing its tags. Runs in a transaction that is rolled back on
+    /// failure.
+    /// # Errors
+    /// Returns an error if no item with `item_id` exists, if the update fails,
+    /// or if the transaction cannot be committed.
     pub async fn update_item_from_form<T: ItemMetadata + ?Sized>(
         &self,
         item_id: i32,
@@ -190,6 +210,9 @@ WHERE id = ?
         Ok(())
     }
 
+    /// Set the description for the item identified by `item_id`.
+    /// # Errors
+    /// Returns an error if the update query fails.
     pub async fn set_item_description(&self, item_id: i32, description: &str) -> Result<()> {
         sqlx::query("UPDATE items SET description = ? WHERE id = ?")
             .bind(description)
@@ -200,6 +223,9 @@ WHERE id = ?
         Ok(())
     }
 
+    /// Set the shared paper id for the item identified by `item_id`.
+    /// # Errors
+    /// Returns an error if the update query fails.
     pub async fn set_shared_paper_id(&self, item_id: i32, paper_id: &str) -> Result<()> {
         sqlx::query("UPDATE items SET shared_paper_id = ? WHERE id = ?")
             .bind(paper_id)

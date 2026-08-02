@@ -7,6 +7,12 @@ use crate::app_config::AppConfig;
 
 const KEY_FILENAME: &str = "share_identity.key";
 
+/// Load the persisted share identity key from `data_dir`, generating and
+/// persisting a new one if none exists yet. Returns an ephemeral,
+/// non-persisted key if `AppConfig::ephemeral_identity` is set.
+/// # Errors
+/// Returns an error if the existing key file is corrupted, or if a newly
+/// generated key cannot be written to disk.
 pub fn load_or_create_secret_key(data_dir: &Path) -> Result<SecretKey> {
     let path = data_dir.join(KEY_FILENAME);
 

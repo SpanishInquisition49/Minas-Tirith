@@ -16,6 +16,9 @@ pub struct CoreManager {
 }
 
 impl CoreManager {
+    /// Construct a [`CoreManager`] authenticated with the given CORE API
+    /// `key`.
+    #[must_use]
     pub fn new(key: String) -> Self {
         Self { key }
     }
@@ -110,10 +113,10 @@ impl ItemMetadata for CoreItem {
     }
 
     fn publication_date(&self) -> Option<Cow<'_, str>> {
-        if !self.year_published.trim().is_empty() {
-            Some(Cow::Borrowed(&self.year_published))
-        } else {
+        if self.year_published.trim().is_empty() {
             None
+        } else {
+            Some(Cow::Borrowed(&self.year_published))
         }
     }
 

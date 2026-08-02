@@ -45,6 +45,10 @@ pub struct SharedItemEntry {
 }
 
 impl SharedItemEntry {
+    /// Build a [`SharedItemEntry`] describing `item` as published to a
+    /// shared library under `item_id`, referencing the blob identified by
+    /// `blob_hash`/`blob_size` and owned by `owner`.
+    #[must_use]
     pub fn new(
         item: &DatabaseItem,
         item_id: Uuid,
@@ -76,6 +80,11 @@ impl SharedItemEntry {
 }
 
 impl ShareNode {
+    /// Create a new shared-library document namespace and its author
+    /// identity.
+    /// # Errors
+    /// Returns an error if creating the author or the document namespace
+    /// fails.
     pub async fn create_library(&self) -> Result<(Doc, AuthorId)> {
         let author = self
             .docs
@@ -92,6 +101,10 @@ impl ShareNode {
         Ok((doc, author))
     }
 
+    /// Publish `entry` into `doc` under `author`, keyed by its item id.
+    /// # Errors
+    /// Returns an error if serializing `entry` or writing it to the document
+    /// fails.
     pub async fn publish_paper(
         &self,
         doc: &Doc,
@@ -106,6 +119,11 @@ impl ShareNode {
         Ok(())
     }
 
+    /// Fetch every [`SharedItemEntry`] currently published in `doc`.
+    /// # Errors
+    /// Returns an error if the document cannot be queried, an entry cannot
+    /// be read, its content cannot be fetched, or it cannot be
+    /// deserialized.
     pub async fn list_items(&self, doc: &Doc) -> Result<Vec<SharedItemEntry>> {
         let stream = doc
             .get_many(Query::single_latest_per_key())
@@ -131,12 +149,19 @@ impl ShareNode {
         Ok(out)
     }
 
+    /// Generate a read-only ticket that lets other peers subscribe to `doc`.
+    /// # Errors
+    /// Returns an error if generating the ticket fails.
     pub async fn share_library(&self, doc: &Doc) -> Result<DocTicket> {
         doc.share(ShareMode::Read, AddrInfoOptions::Id)
             .await
             .map_err(|_| eyre!("Generating doc ticket"))
     }
 
+    /// Parse `ticket_str` and import the shared document it references.
+    /// # Errors
+    /// Returns an error if the ticket cannot be parsed or the document
+    /// cannot be imported.
     pub async fn subscribe_library(&self, ticket_str: &str) -> Result<(Doc, NamespaceId)> {
         let ticket = DocTicket::from_str(ticket_str).context("Parsing doc ticket")?;
         let namespace_id = ticket.capability.id();

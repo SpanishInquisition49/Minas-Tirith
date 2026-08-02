@@ -13,6 +13,9 @@ pub struct ImageCache {
 }
 
 impl ImageCache {
+    /// Construct an [`ImageCache`] that stores downloaded/generated covers
+    /// under `cache_dir`.
+    #[must_use]
     pub fn new(cache_dir: PathBuf) -> Self {
         Self {
             client: Client::new(),
@@ -34,6 +37,11 @@ impl ImageCache {
         self.cache_path.join(format!("{hash:x}.{extension}"))
     }
 
+    /// Fetch the image at `url`, using a cached copy if one already exists.
+    /// `file://` URLs are returned as local paths without downloading.
+    /// # Errors
+    /// Returns an error if the download request fails or the image cannot be
+    /// written to the cache.
     pub async fn get_or_download(&self, url: &str) -> color_eyre::Result<PathBuf> {
         if let Some(local) = url.strip_prefix("file://") {
             return Ok(PathBuf::from(local));
@@ -64,9 +72,17 @@ impl ImageCache {
         }
     }
 
+    /// Path prefix (without extension) used for a generated cover of the
+    /// item identified by `item_id`.
+    #[must_use]
     pub fn generated_prefix(&self, item_id: i32) -> PathBuf {
         self.cache_path.join(format!("generated-{item_id}"))
     }
+
+    /// Write a generated cover's `bytes` to the cache under `item_id`, using
+    /// `extension` as the file extension.
+    /// # Errors
+    /// Returns an error if the file cannot be written.
     pub fn store_generated(
         &self,
         item_id: i32,

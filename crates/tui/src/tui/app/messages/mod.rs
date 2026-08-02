@@ -33,9 +33,10 @@ impl App {
                 .refresh(self.collection_component.selected())
                 .await?;
         } else {
-            let title = match was_update {
-                true => " Update tome ",
-                false => " Insert new tome ",
+            let title = if was_update {
+                " Update tome "
+            } else {
+                " Insert new tome "
             };
             let reason = self
                 .metadata_component
@@ -49,7 +50,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_abstract_message(&mut self, data: AbstractData) {
+    fn handle_abstract_message(&mut self, data: &AbstractData) {
         let id = data.item_id;
         let applied = self.metadata_component.core_mut().on_abstract_result(data);
         let Some(item) = self
@@ -71,21 +72,20 @@ impl App {
         } else {
             // NOTE: on failure we log instead of pushing a notification, is less annoying
             // moreover, the fetching is fired without the user consent
-            tracing::warn!(item_id = id, "Could not find an abstract text")
+            tracing::warn!(item_id = id, "Could not find an abstract text");
         }
     }
 
+    /// Drain and apply all pending background-task and cover messages.
+    /// # Errors
+    /// Returns an error if applying a save-result message fails.
     pub async fn poll_messages(&mut self) -> Result<()> {
         // NOTE: Listen for core messages
         while let Ok(message) = self.task_channel_rx.try_recv() {
             match message {
                 Message::Save(outcome) => self.handle_save_message(outcome).await?,
                 Message::Metadata(candidates) => self.handle_metadata_search_message(candidates),
-                /*Message::ImageCover(cover_data) => {
-                    self.covers.handle_ready(*cover_data, &mut self.items)
-                }*/
-                //Message::ImageCoverFailed { item_id } => self.covers.handle_failed(item_id),
-                Message::Abstract(abstract_data) => self.handle_abstract_message(abstract_data),
+                Message::Abstract(abstract_data) => self.handle_abstract_message(&abstract_data),
                 Message::LibraryItemsDiscovered(items_data) => {
                     self.library_component
                         .core_mut()
@@ -93,7 +93,7 @@ impl App {
                 }
                 Message::ItemDownloadReady(download_ready_data) => {
                     self.handle_item_download_ready(
-                        download_ready_data.entry,
+                        &download_ready_data.entry,
                         download_ready_data.local_path,
                     );
                 }

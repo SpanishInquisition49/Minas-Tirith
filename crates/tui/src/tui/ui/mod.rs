@@ -38,6 +38,8 @@ use crate::tui::{
     },
 };
 
+/// Render the whole application for the current frame, dispatching to the
+/// active mode's popups on top of the base layout.
 pub fn draw(f: &mut Frame, app: &mut App) {
     let screen = Layout::default()
         .direction(Direction::Vertical)
@@ -78,9 +80,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     draw_details(f, app, main[1]);
     draw_search_bar(f, app, screen[0]);
     match app.mode() {
-        Mode::Normal => {}                      // NO additional rendering
-        Mode::Insert => draw_add_popup(f, app), // Add item popup
-        Mode::Search => {} // search bar is always rendered full-width below, nothing to overlay
+        Mode::Normal | Mode::Search => {}       // No additional rendering
+        Mode::Insert => draw_add_popup(f, app), // Add item pop-up
         Mode::MetadataSelect => draw_metadata_select_popup(f, app),
         Mode::MetadataEdit => draw_metadata_edit_popup(f, app),
         Mode::CollectionCreate => draw_collection_create_popup(f, app),
@@ -116,7 +117,7 @@ fn draw_search_bar(f: &mut Frame, app: &mut App, area: Rect) {
         let width = area.width.max(3) - 3;
         let scroll = search_input.visual_scroll(width as usize);
         let x = search_input.visual_cursor().max(scroll) - scroll + 1;
-        f.set_cursor_position((area.x + x as u16, area.y + 1))
+        f.set_cursor_position((area.x + u16::try_from(x).unwrap_or_default(), area.y + 1));
     }
 
     let search_text = if app.item_search_input().value().is_empty() && !searching {

@@ -24,6 +24,9 @@ pub struct LibraryComponent {
 }
 
 impl LibraryComponent {
+    /// Construct a [`LibraryComponent`] backed by `archive` and
+    /// `share_node`, downloading imported items into `import_dir` and
+    /// reporting async results via `tx`.
     pub fn new(
         archive: Arc<Archive>,
         share_node: ShareNode,
@@ -42,42 +45,54 @@ impl LibraryComponent {
         }
     }
 
+    /// The underlying [`LibraryState`].
     pub fn core(&self) -> &LibraryState {
         &self.core
     }
 
+    /// Mutable access to the underlying [`LibraryState`].
     pub fn core_mut(&mut self) -> &mut LibraryState {
         &mut self.core
     }
 
+    /// The input widget for the publish dialog's collection-name field.
     pub fn collection_name(&self) -> &Input {
         &self.collection_name
     }
 
+    /// The input widget for the publish dialog's collection-description
+    /// field.
     pub fn collection_description(&self) -> &Input {
         &self.collection_description
     }
 
+    /// The input widget for the subscribe dialog's ticket field.
     pub fn subscribe_ticket(&self) -> &Input {
         &self.ticket
     }
 
+    /// The input widget for the subscribe dialog's nickname field.
     pub fn subscribe_nickname(&self) -> &Input {
         &self.nickname
     }
 
+    /// Mutable access to the subscription list's ratatui `ListState`.
     pub fn subscription_list_state_mut(&mut self) -> &mut ListState {
         &mut self.subscription_list_state
     }
 
+    /// Mutable access to the browse-items list's ratatui `ListState`.
     pub fn browse_list_state_mut(&mut self) -> &mut ListState {
         &mut self.browse_list_state
     }
 
+    /// Mutable access to the manage-libraries list's ratatui `ListState`.
     pub fn manage_list_state_mut(&mut self) -> &mut ListState {
         &mut self.manage_list_state
     }
 
+    /// Route `event` to whichever publish-dialog input is currently
+    /// focused. No-op if the publish dialog isn't open.
     pub fn handle_publish_event(&mut self, event: &Event) {
         let Some(s) = self.core.get_publish_state() else {
             return;
@@ -88,6 +103,8 @@ impl LibraryComponent {
         };
     }
 
+    /// Route `event` to whichever subscribe-dialog input is currently
+    /// focused. No-op if the subscribe dialog isn't open.
     pub fn handle_subscribe_event(&mut self, event: &Event) {
         let Some(s) = self.core.get_subscribe_state() else {
             return;

@@ -1,4 +1,5 @@
 use core::fmt;
+use std::fmt::Write;
 
 use serde::Deserialize;
 
@@ -19,7 +20,7 @@ impl fmt::Display for Author {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut res = format!("Name: {}\n", self.name);
         if let Some(bio) = &self.bio {
-            res.push_str(&format!("Bio:\n{}", bio));
+            let _ = write!(res, "Bio:\n{bio}");
         }
         write!(f, "{res}")
     }

@@ -35,6 +35,9 @@ pub struct CoverComponent {
 }
 
 impl CoverComponent {
+    /// Construct a [`CoverComponent`] backed by `archive`, decoding images
+    /// via `picker` and caching them in `cache`. Results are reported via
+    /// `tx`.
     pub fn new(
         archive: Arc<Archive>,
         picker: Picker,
@@ -54,9 +57,7 @@ impl CoverComponent {
 
     /// Kicks off a download or generation task if not already in cache or pin flight
     pub fn request(&mut self, id: i32, cover_url: Option<String>, file_path: String) {
-        if self.covers.contains_key(&id)
-            || self.pending.contains(&id)
-            || self.too_many_failures(&id)
+        if self.covers.contains_key(&id) || self.pending.contains(&id) || self.too_many_failures(id)
         {
             return;
         }
@@ -68,14 +69,14 @@ impl CoverComponent {
     }
 
     /// Don't kicks off another request if too many have failed before
-    fn too_many_failures(&self, item_id: &i32) -> bool {
-        match self.failed.get(item_id) {
+    fn too_many_failures(&self, item_id: i32) -> bool {
+        match self.failed.get(&item_id) {
             Some(f) => *f >= 5,
             None => false,
         }
     }
 
-    /// Applies an inbound 'ItemCover' message: stores the decoded protocol
+    /// Applies an inbound '`ItemCover`' message: stores the decoded protocol
     /// and, for the generated covers, persist the URL on the item
     pub fn handle_ready(&mut self, data: Box<CoverImageData>, items: &mut [DatabaseItem]) {
         self.pending.remove(&data.item_id);
@@ -87,6 +88,8 @@ impl CoverComponent {
         }
     }
 
+    /// Record a failed cover request for `item_id`, counting it towards
+    /// the retry limit.
     pub fn handle_failed(&mut self, item_id: i32) {
         self.pending.remove(&item_id);
         match self.failed.get(&item_id) {
@@ -95,6 +98,7 @@ impl CoverComponent {
         };
     }
 
+    /// The decoded cover image for `item_id`, if one has been loaded.
     pub fn get_mut(&mut self, item_id: i32) -> Option<&mut StatefulProtocol> {
         self.covers.get_mut(&item_id)
     }
@@ -128,7 +132,7 @@ impl CoverComponent {
                 }
             };
             if let Err(e) = tx.send(message) {
-                tracing::error!(error = %e, item_id = id, "Failed to send the cover download result to the main task")
+                tracing::error!(error = %e, item_id = id, "Failed to send the cover download result to the main task");
             }
         });
     }
@@ -169,7 +173,7 @@ impl CoverComponent {
                 }
             };
             if let Err(e) = tx.send(message) {
-                tracing::error!(error = %e, item_id = id, "Failed to send the cover generation result to the main task")
+                tracing::error!(error = %e, item_id = id, "Failed to send the cover generation result to the main task");
             }
         });
     }

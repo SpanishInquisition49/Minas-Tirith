@@ -7,6 +7,7 @@ pub struct SourceTag {
 }
 
 impl SourceTag {
+    /// Construct a color-coded [`SourceTag`] pill for `source`.
     pub fn new(source: String) -> Self {
         Self { source }
     }

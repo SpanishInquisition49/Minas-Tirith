@@ -55,7 +55,7 @@ struct CrossrefDate {
 }
 impl ItemMetadata for CrossrefItem {
     fn title(&self) -> Cow<'_, str> {
-        match self.title.first().map(|s| s.as_str()) {
+        match self.title.first().map(std::string::String::as_str) {
             Some(title) => Cow::Borrowed(title),
             None => Cow::default(),
         }
@@ -157,6 +157,8 @@ impl ItemMetadata for CrossrefItem {
 pub struct CrossrefManager {}
 
 impl CrossrefManager {
+    /// Construct a [`CrossrefManager`].
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -215,12 +217,12 @@ impl MetadataFetcher for CrossrefManager {
             .send()
             .await
             .context("Crossref DOI lookup")?;
-        if !res.status().is_success() {
-            Ok(None)
-        } else {
+        if res.status().is_success() {
             let parsed: CrossrefWorkResponse =
                 res.json().await.context("Crossref DOI json parsing")?;
             Ok(parsed.message.description().map(|d| d.to_string()))
+        } else {
+            Ok(None)
         }
     }
 }

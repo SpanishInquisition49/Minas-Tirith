@@ -85,10 +85,10 @@ impl App {
                 }
             }
             (KeyModifiers::CONTROL, KeyCode::Char('s')) => {
-                self.publish_collection_as_library().await?
+                self.publish_collection_as_library().await?;
             }
-            (_, KeyCode::Esc) | (_, KeyCode::Char('q')) => {
-                self.library_component.core_mut().cancel_publish()
+            (_, KeyCode::Esc | KeyCode::Char('q')) => {
+                self.library_component.core_mut().cancel_publish();
             }
             _ => {}
         }

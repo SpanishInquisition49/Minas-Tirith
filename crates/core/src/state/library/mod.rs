@@ -41,6 +41,10 @@ pub struct LibraryState {
 }
 
 impl LibraryState {
+    /// Construct a [`LibraryState`] backed by `archive` and `share_node`,
+    /// downloading imported items into `import_dir` and reporting async
+    /// results via `tx`.
+    #[must_use]
     pub fn new(
         archive: Arc<Archive>,
         share_node: ShareNode,
@@ -64,20 +68,29 @@ impl LibraryState {
     }
 
     /// Fetch the shared libraries and the subscriptions from the database
+    /// # Errors
+    /// Returns an error if fetching shared libraries or subscriptions
+    /// fails.
     pub async fn refresh(&mut self) -> Result<()> {
         self.shared_libraries = self.archive.get_all_shared_libraries().await?;
         self.subscriptions = self.archive.get_all_subscriptions().await?;
         Ok(())
     }
 
+    /// The locally known library subscriptions.
+    #[must_use]
     pub fn subscriptions(&self) -> &[LibrarySubscription] {
         self.subscriptions.as_slice()
     }
 
+    /// The libraries published from this node.
+    #[must_use]
     pub fn shared_libraries(&self) -> &[SharedLibrary] {
         self.shared_libraries.as_slice()
     }
 
+    /// Items browsed so far for the currently selected subscription
+    /// namespace.
     pub fn current_library_entries(&self) -> &[SharedItemEntry] {
         self.current_namespace()
             .and_then(|ns| self.browsed_items.get(ns))
@@ -117,17 +130,16 @@ impl LibraryState {
                 ),
             };
 
-            let item_id = match &item.fields.shared_paper_id {
-                Some(id) => Uuid::parse_str(id).with_context(|| {
+            let item_id = if let Some(id) = &item.fields.shared_paper_id {
+                Uuid::parse_str(id).with_context(|| {
                     format!("Parsing stored shared_paper_id for item {}", item.id)
-                })?,
-                None => {
-                    let id = Uuid::new_v4();
-                    self.archive
-                        .set_shared_paper_id(item.id, &id.to_string())
-                        .await?;
-                    id
-                }
+                })?
+            } else {
+                let id = Uuid::new_v4();
+                self.archive
+                    .set_shared_paper_id(item.id, &id.to_string())
+                    .await?;
+                id
             };
             let entry = SharedItemEntry::new(
                 item,
@@ -213,7 +225,7 @@ impl LibraryState {
                             }
                         }
                         Err(e) => {
-                            tracing::warn!(error = %e, "Failed to list items after sync event")
+                            tracing::warn!(error = %e, "Failed to list items after sync event");
                         }
                     }
                 }
@@ -249,11 +261,17 @@ impl LibraryState {
             };
 
             if let Err(e) = tx.send(message) {
-                tracing::error!(error = %e, "Failed to send the download item status to main task")
+                tracing::error!(error = %e, "Failed to send the download item status to main task");
             }
         });
     }
 
+    /// Reopen the documents for every known published library and
+    /// subscription after startup.
+    /// # Errors
+    /// Returns an error if a stored namespace id cannot be parsed;
+    /// failures to reopen individual documents are logged rather than
+    /// propagated.
     pub async fn reopen_known_namespaces(&mut self) -> Result<()> {
         for library in &self.shared_libraries {
             let namespace_id = NamespaceId::from_str(&library.namespace_id).map_err(|e| {
@@ -355,7 +373,7 @@ impl LibraryState {
                             }
                         }
                         Err(e) => {
-                            tracing::warn!(error = %e, "Failed to list papers after sync event (reopened)")
+                            tracing::warn!(error = %e, "Failed to list papers after sync event (reopened)");
                         }
                     }
                 }
@@ -394,6 +412,9 @@ impl LibraryState {
     }
 
     /// Delete a previously published library
+    /// # Errors
+    /// Returns an error if deleting the shared library from the archive
+    /// fails.
     pub async fn unpublish(&mut self, id: i32) -> Result<()> {
         self.archive.delete_shared_library(id).await?;
         self.shared_libraries.retain(|l| l.id != id);
@@ -401,6 +422,9 @@ impl LibraryState {
     }
 
     /// Cancel a subscription to a shared library
+    /// # Errors
+    /// Returns an error if deleting the subscription from the archive
+    /// fails.
     pub async fn unsubscribe(&mut self, namespace_str: &str) -> Result<()> {
         self.archive.delete_subscription(namespace_str).await?;
         self.subscriptions

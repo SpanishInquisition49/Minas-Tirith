@@ -123,6 +123,9 @@ pub struct GoogleBooksManager {
 }
 
 impl GoogleBooksManager {
+    /// Construct a [`GoogleBooksManager`] authenticated with the given
+    /// Google Books API `key`.
+    #[must_use]
     pub fn new(key: String) -> Self {
         Self { key }
     }

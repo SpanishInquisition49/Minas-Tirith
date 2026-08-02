@@ -12,6 +12,7 @@ use ratatui::{
 
 use crate::tui::app::{App, Focus};
 
+/// Render the collection sidebar.
 pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     let focused = matches!(app.focus(), Focus::Collections);
     let border_style = if focused {
@@ -51,6 +52,7 @@ pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
     f.render_stateful_widget(list, area, app.collection_list_state_mut());
 }
 
+/// Render the collection-creation popup.
 pub fn draw_collection_create_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()
@@ -68,10 +70,11 @@ pub fn draw_collection_create_popup(f: &mut Frame, app: &mut App) {
             ),
     );
     f.render_widget(input, center);
-    let x = app.collection_input_field().visual_cursor() as u16 + 1;
+    let x = u16::try_from(app.collection_input_field().visual_cursor()).unwrap_or_default() + 1;
     f.set_cursor_position((center.x + x, center.y + 1));
 }
 
+/// Render the item/collection assignment popup.
 pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
     let center = f
         .area()

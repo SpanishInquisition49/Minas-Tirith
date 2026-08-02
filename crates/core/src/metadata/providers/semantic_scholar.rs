@@ -113,6 +113,8 @@ pub struct SemanticScholarManager {}
 impl SemanticScholarManager {
     const BASE_URL: &str = "https://api.semanticscholar.org/graph/v1/paper";
 
+    /// Construct a [`SemanticScholarManager`].
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -137,7 +139,7 @@ impl MetadataFetcher for SemanticScholarManager {
             let res = client
                 .get(&url)
                 .query(&[
-                    ("query", title.to_string().as_str()),
+                    ("query", title.clone().as_str()),
                     (
                         "fields",
                         "title,abstract,year,externalIds,authors,venue,publicationTypes",
@@ -189,14 +191,14 @@ impl MetadataFetcher for SemanticScholarManager {
             .await
             .context("Semantic Scholar DOI lookup")?;
 
-        if !res.status().is_success() {
-            Ok(None)
-        } else {
+        if res.status().is_success() {
             let parsed: SemanticScholarPaperResponse = res
                 .json()
                 .await
                 .context("Semantic Scholar DOI json parsing")?;
             Ok(parsed.r#abstract)
+        } else {
+            Ok(None)
         }
     }
 }

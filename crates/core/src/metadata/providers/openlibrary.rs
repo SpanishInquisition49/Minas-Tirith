@@ -88,6 +88,8 @@ impl ItemMetadata for OpenLibraryItem {
 }
 
 impl OpenLibraryManager {
+    /// Construct an [`OpenLibraryManager`].
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }

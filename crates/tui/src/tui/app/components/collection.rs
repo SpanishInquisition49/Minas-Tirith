@@ -18,6 +18,8 @@ pub struct CollectionComponent {
 }
 
 impl CollectionComponent {
+    /// Construct a [`CollectionComponent`] backed by `archive`, with no
+    /// collections loaded yet.
     pub fn new(archive: Arc<Archive>) -> Self {
         let core = CollectionState::new(archive);
         Self {
@@ -27,37 +29,51 @@ impl CollectionComponent {
         }
     }
 
+    /// Reload the collection list from the archive.
+    /// # Errors
+    /// Returns an error if fetching collections fails.
     pub async fn refresh(&mut self) -> Result<()> {
         self.core.refresh().await?;
         Ok(())
     }
 
+    /// All collections currently loaded.
     pub fn items(&self) -> &[Collection] {
         self.core.items()
     }
 
+    /// The currently selected collection, if any.
     pub fn selected(&self) -> Option<&Collection> {
         self.core
             .selected_index()
             .and_then(|i| self.core.items().get(i))
     }
 
+    /// Mutable access to the collection list's ratatui `ListState`.
     pub fn list_state_mut(&mut self) -> &mut ListState {
         &mut self.list_state
     }
 
+    /// The underlying [`CollectionState`].
     pub fn core(&self) -> &CollectionState {
         &self.core
     }
 
+    /// Mutable access to the underlying [`CollectionState`].
     pub fn core_mut(&mut self) -> &mut CollectionState {
         &mut self.core
     }
 
+    /// Reset the new-collection name input, ready for the create dialog.
     pub fn open_create(&mut self) {
         self.name_input.reset();
     }
 
+    /// Create a collection from the current name input, then refresh and
+    /// resync the list. No-op if the input is blank.
+    /// # Errors
+    /// Returns an error if creating or refreshing the collection list
+    /// fails.
     pub async fn confirm_create(&mut self) -> Result<()> {
         let name = self.name_input.value_and_reset();
         let name = name.trim();
@@ -70,10 +86,12 @@ impl CollectionComponent {
         Ok(())
     }
 
+    /// The input widget for the new-collection name field.
     pub fn name_input(&self) -> &Input {
         &self.name_input
     }
 
+    /// Route `event` to the new-collection name input.
     pub fn handle_event(&mut self, event: &Event) {
         self.name_input.handle_event(event);
     }

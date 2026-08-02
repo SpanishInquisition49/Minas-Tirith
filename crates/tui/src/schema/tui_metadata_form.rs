@@ -45,7 +45,7 @@ impl MetadataForm for TuiMetadataForm {
             tags: self
                 .tags
                 .value()
-                .split(",")
+                .split(',')
                 .map(|t| t.trim().to_string())
                 .collect(),
             authors: self.authors,
@@ -61,8 +61,8 @@ impl MetadataForm for TuiMetadataForm {
                 candidate
                     .description()
                     .unwrap_or_default()
-                    .split("\n")
-                    .map(|l| l.to_string())
+                    .split('\n')
+                    .map(std::string::ToString::to_string)
                     .collect::<Vec<_>>(),
             ),
             doi: candidate.doi().unwrap_or_default().to_string().into(),
@@ -72,7 +72,7 @@ impl MetadataForm for TuiMetadataForm {
                 .unwrap_or_default()
                 .to_string()
                 .into(),
-            tags: Input::new("".to_string()),
+            tags: Input::new(String::new()),
             item_type: candidate.item_type(),
             cover_image_url: candidate
                 .cover_image_url()
@@ -156,6 +156,8 @@ impl MetadataForm for TuiMetadataForm {
 }
 
 impl TuiMetadataForm {
+    /// Route `event` to the input widget for the field currently being
+    /// edited.
     pub fn handle_event(&mut self, event: &Event) {
         match self.field {
             Field::Title => self.title.handle_event(event),

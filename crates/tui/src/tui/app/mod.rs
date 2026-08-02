@@ -112,6 +112,13 @@ impl Focusable for App {
 }
 
 impl App {
+    /// Construct the [`App`], wiring up all components, loading initial
+    /// data (items, collections, known shared-library namespaces), and
+    /// kicking off cover fetching for the selected item.
+    /// # Errors
+    /// Returns an error if the import directory cannot be created, the
+    /// peer share node cannot bind, the file explorer cannot be built, or
+    /// loading initial data from the archive/shared libraries fails.
     pub async fn new(
         archive: Archive,
         picker: Picker,
@@ -185,7 +192,7 @@ impl App {
                 } else {
                     match f.path.extension() {
                         Some(extension) => match extension.to_str() {
-                            Some("pdf") | Some("epub") => Some(f),
+                            Some("pdf" | "epub") => Some(f),
                             _ => None,
                         },
                         None => None,
@@ -195,10 +202,12 @@ impl App {
             .build()?)
     }
 
+    /// Apply `theme` to the file explorer.
     pub fn set_explorer_theme(&mut self, theme: Theme) {
         self.file_explorer.set_theme(theme);
     }
 
+    /// The file explorer used by the file picker.
     pub fn file_explorer(&self) -> &FileExplorer {
         &self.file_explorer
     }
@@ -228,44 +237,54 @@ impl App {
                 let _ = self.notifications.add(notif);
             }
             Err(e) => {
-                tracing::error!(error = %e, "Could not build notification")
+                tracing::error!(error = %e, "Could not build notification");
             }
         }
     }
 
+    /// Advance the notification animations by one tick.
     pub fn notification_tick(&mut self) {
         self.notifications.tick(Duration::from_millis(16));
     }
 
+    /// Mutable access to the active notifications.
     pub fn notifications(&mut self) -> &mut Notifications {
         &mut self.notifications
     }
 
+    /// Open the help screen.
     pub fn open_help(&mut self) {
         self.help_scroll = 0;
         self.mode = Mode::Help;
     }
 
+    /// Clamp the help screen's scroll offset to `max_scroll`.
     pub fn set_help_scroll(&mut self, max_scroll: u16) {
         self.help_scroll = self.help_scroll.min(max_scroll);
     }
 
+    /// The help screen's current scroll offset.
     pub fn get_help_scroll(&self) -> u16 {
         self.help_scroll
     }
 
+    /// Whether the application has been asked to quit.
     pub fn quit(&self) -> bool {
         self.quit
     }
 
+    /// The current UI mode.
     pub fn mode(&self) -> Mode {
         self.mode
     }
 
+    /// The currently focused pane (items or collections).
     pub fn focus(&self) -> Focus {
         self.focus
     }
 
+    /// Advance the loading spinner by one frame and return its current
+    /// glyph.
     pub fn tick(&mut self) -> &str {
         let spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
         let frame = spinner[self.tick_counter % spinner.len()];

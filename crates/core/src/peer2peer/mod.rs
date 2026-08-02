@@ -115,14 +115,15 @@ const EPITHETS: &[&str] = &[
 pub trait PrettyDisplay {
     fn node_id(&self) -> PublicKey;
 
-    /// Deterministically maps a NodeId's public key to a human-friendly name.
+    /// Deterministically maps a `NodeId`'s public key to a human-friendly name.
     /// Same key -> same name, every time, on every peer's screen.
     fn pretty_name(&self) -> String {
         let mut hasher = DefaultHasher::new();
         self.node_id().as_bytes().hash(&mut hasher);
         let hash = hasher.finish();
 
-        let adjective = ADJECTIVES[(hash as usize) % ADJECTIVES.len()];
+        let n = usize::try_from(hash).unwrap_or_default();
+        let adjective = ADJECTIVES[(n) % ADJECTIVES.len()];
         let noun = NOUNS[((hash >> 10) as usize) % NOUNS.len()];
         let epithet = EPITHETS[((hash >> 20) as usize) % EPITHETS.len()];
         let suffix = hash & 0xFFF;

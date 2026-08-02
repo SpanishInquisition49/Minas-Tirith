@@ -8,6 +8,12 @@ use tokio::time::interval;
 
 use crate::tui::{app::App, ui::draw};
 
+/// Run the main TUI event loop: render each frame, then either handle the
+/// next input event or poll background-task messages on a ~16ms tick,
+/// until the app requests to quit.
+/// # Errors
+/// Returns an error if drawing the frame or handling an event/message
+/// fails.
 pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     let mut events = EventStream::new();
     let mut tick = interval(Duration::from_millis(16));
@@ -32,10 +38,9 @@ pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Resul
 
         if app.quit() {
             break;
-        } else {
-            app.request_cover_for_selected();
-            app.request_abstract_for_selected();
         }
+        app.request_cover_for_selected();
+        app.request_abstract_for_selected();
     }
     Ok(())
 }

@@ -4,6 +4,11 @@ use color_eyre::eyre::{Context, bail};
 
 use crate::metadata::image_cache::ImageCache;
 
+/// Generate a cover image for `file_path` based on its extension (PDF or
+/// EPUB), caching the result via `cache`. Returns `None` if the file type
+/// isn't supported or no cover could be extracted.
+/// # Errors
+/// Returns an error if cover generation for the underlying file type fails.
 pub async fn generate_cover(
     file_path: &Path,
     item_id: i32,
@@ -16,6 +21,10 @@ pub async fn generate_cover(
     }
 }
 
+/// Render the first page of the PDF at `file_path` to a cached cover image
+/// using `pdftoppm`.
+/// # Errors
+/// Returns an error if `pdftoppm` fails to run or exits unsuccessfully.
 pub async fn generate_from_pdf(
     file_path: &Path,
     item_id: i32,
@@ -42,6 +51,11 @@ pub async fn generate_from_pdf(
     }
 }
 
+/// Extract the cover image embedded in the EPUB at `file_path` and store it
+/// via `cache`. Returns `None` if the EPUB has no cover.
+/// # Errors
+/// Returns an error if the EPUB cannot be opened or the extraction task
+/// fails to join.
 pub async fn generate_from_epub(
     file_path: &Path,
     item_id: i32,

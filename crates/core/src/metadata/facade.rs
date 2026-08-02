@@ -30,6 +30,9 @@ impl Default for MetadataProvider {
 }
 
 impl MetadataProvider {
+    /// Build a [`MetadataProvider`] with every built-in provider, plus any
+    /// optional providers (Google Books, CORE) whose API key is configured.
+    #[must_use]
     pub fn new() -> Self {
         let cfg = AppConfig::get();
         let mut providers: Vec<Arc<dyn MetadataFetcher>> = vec![
@@ -39,10 +42,10 @@ impl MetadataProvider {
             Arc::new(SemanticScholarManager::new()),
         ];
         if let Some(key) = cfg.api_key("google_books") {
-            providers.push(Arc::new(GoogleBooksManager::new(key.to_string())))
+            providers.push(Arc::new(GoogleBooksManager::new(key.to_string())));
         }
         if let Some(key) = cfg.api_key("core") {
-            providers.push(Arc::new(CoreManager::new(key.to_string())))
+            providers.push(Arc::new(CoreManager::new(key.to_string())));
         }
 
         Self {
@@ -56,21 +59,20 @@ impl MetadataProvider {
     pub async fn fetch(&self, title: &str) -> Vec<MergedCandidate> {
         let mut res = Vec::new();
         let mut tasks = tokio::task::JoinSet::new();
-        for provider in self.providers.iter() {
+        for provider in &self.providers {
             let client = self.client.clone();
             let title = title.to_string();
             let p = provider.clone();
             tasks.spawn(async move {
-                match timeout(Duration::from_secs(30), p.fetch(client, title)).await {
-                    Ok(result) => result.unwrap_or_default(),
-                    Err(_) => {
-                        let provider_name = p.name();
-                        tracing::warn!(
-                            provider = provider_name,
-                            "Timeout fired while fetching metadata candidates"
-                        );
-                        vec![]
-                    }
+                if let Ok(result) = timeout(Duration::from_secs(30), p.fetch(client, title)).await {
+                    result.unwrap_or_default()
+                } else {
+                    let provider_name = p.name();
+                    tracing::warn!(
+                        provider = provider_name,
+                        "Timeout fired while fetching metadata candidates"
+                    );
+                    vec![]
                 }
             });
         }
@@ -89,16 +91,16 @@ impl MetadataProvider {
         doi: Option<String>,
         isbn: Option<String>,
     ) -> Option<String> {
-        for provider in self.providers.iter() {
+        for provider in &self.providers {
             let client = self.client.clone();
 
-            match timeout(
+            if let Ok(result) = timeout(
                 Duration::from_secs(30),
                 provider.fetch_abstract(client, title.to_string(), doi.clone(), isbn.clone()),
             )
             .await
             {
-                Ok(result) => match result {
+                match result {
                     Ok(maybe_abstract) => {
                         if let Some(text) = maybe_abstract
                             && !text.trim().is_empty()
@@ -107,13 +109,14 @@ impl MetadataProvider {
                         }
                     }
                     Err(e) => {
-                        tracing::error!(error = %e, provider = provider.name(), "Failed to fetch abstract")
+                        tracing::error!(error = %e, provider = provider.name(), "Failed to fetch abstract");
                     }
-                },
-                Err(_) => tracing::warn!(
+                }
+            } else {
+                tracing::warn!(
                     provider = provider.name(),
                     "Timeout fired while fetching abstract"
-                ),
+                );
             }
         }
         None

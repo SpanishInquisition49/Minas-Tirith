@@ -40,6 +40,10 @@ pub struct MetadataState<T: MetadataForm> {
 }
 
 impl<T: MetadataForm> MetadataState<T> {
+    /// Construct a [`MetadataState`] backed by `archive`, using `provider`
+    /// to fetch candidates and `tx` to report results back to the main
+    /// task.
+    #[must_use]
     pub fn new(
         archive: Arc<Archive>,
         provider: Arc<MetadataProvider>,
@@ -62,18 +66,22 @@ impl<T: MetadataForm> MetadataState<T> {
         }
     }
 
+    /// Whether a save task is currently in flight.
     pub fn is_saving(&self) -> bool {
         self.is_saving
     }
 
+    /// Whether a metadata search task is currently in flight.
     pub fn is_searching(&self) -> bool {
         self.is_searching
     }
 
+    /// The last error reported by a save attempt, if any.
     pub fn last_error(&self) -> Option<Cow<'_, str>> {
         self.last_error.as_deref().map(Cow::Borrowed)
     }
 
+    /// Mutable access to the form currently being edited, if any.
     pub fn form_mut(&mut self) -> &mut Option<T> {
         &mut self.form
     }
@@ -117,6 +125,9 @@ impl<T: MetadataForm> MetadataState<T> {
 
     // NOTE: ================== METADATA EDITING ==================
 
+    /// Open the form editor pre-filled from the currently selected
+    /// candidate. Returns `false` if there is no selected candidate or
+    /// fallback path.
     pub fn open_edit_for_candidate(&mut self) -> bool {
         let Some(index) = self.selected_candidate_index else {
             return false;
@@ -133,15 +144,19 @@ impl<T: MetadataForm> MetadataState<T> {
         true
     }
 
+    /// Clear the current metadata search candidates.
     pub fn clear_candidates(&mut self) {
         self.candidates.clear();
     }
 
+    /// Open `form` for editing under the given `ctx`, replacing any
+    /// in-progress edit.
     pub fn set_edit(&mut self, form: T, ctx: EditContext) {
         self.form = Some(form);
         self.edit_context = Some(ctx);
     }
 
+    /// Discard the form currently being edited, if any.
     pub fn cancel_form(&mut self) {
         self.form = None;
         self.edit_context = None;
@@ -170,7 +185,7 @@ impl<T: MetadataForm> MetadataState<T> {
             };
             let was_update = matches!(&ctx, EditContext::ExistingItem { id: _ });
             let outcome = match result {
-                Ok(_) => SaveOutcome::Saved { was_update },
+                Ok(()) => SaveOutcome::Saved { was_update },
                 Err(e) => {
                     tracing::warn!(error = %e, "Failed to write to database");
                     SaveOutcome::Failed {
@@ -181,11 +196,12 @@ impl<T: MetadataForm> MetadataState<T> {
             };
 
             if let Err(e) = tx.send(Message::Save(outcome)) {
-                tracing::error!(error = %e, "Failed to send the saving outcome to the the main task")
+                tracing::error!(error = %e, "Failed to send the saving outcome to the the main task");
             }
         });
     }
 
+    /// Apply the outcome of a save task. Returns `(success, was_update)`.
     pub fn on_save_result(&mut self, outcome: SaveOutcome) -> (bool, bool) {
         self.is_saving = false;
         match outcome {
@@ -194,7 +210,7 @@ impl<T: MetadataForm> MetadataState<T> {
                 (true, was_update)
             }
             SaveOutcome::Failed { reason, was_update } => {
-                self.last_error = Some(reason.to_string());
+                self.last_error = Some(reason.clone());
                 (false, was_update)
             }
         }
@@ -228,7 +244,7 @@ impl<T: MetadataForm> MetadataState<T> {
             let abstract_text = provider.fetch_abstract(&title, doi, isbn).await;
             let msg = if let Some(a) = &abstract_text {
                 match archive.set_item_description(id, a).await {
-                    Ok(_) => AbstractData {
+                    Ok(()) => AbstractData {
                         item_id: id,
                         abstract_text,
                         success: true,
@@ -250,12 +266,14 @@ impl<T: MetadataForm> MetadataState<T> {
                 }
             };
             if let Err(e) = tx.send(Message::Abstract(msg)) {
-                tracing::error!(error = %e, item_id = id, "Failed to send the abstact to the main task")
+                tracing::error!(error = %e, item_id = id, "Failed to send the abstact to the main task");
             }
         });
     }
 
-    pub fn on_abstract_result(&mut self, data: AbstractData) -> bool {
+    /// Apply the outcome of an abstract-fetch task. Returns `true` if a
+    /// usable abstract was found.
+    pub fn on_abstract_result(&mut self, data: &AbstractData) -> bool {
         self.pending_abstract.remove(&data.item_id);
         if !data.success {
             self.failed_abstract.insert(data.item_id);

@@ -3,6 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use crate::tui::app::{App, Mode};
 
 impl App {
+    /// Handle a key press while the help screen is open.
     pub fn handle_help_mode(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {

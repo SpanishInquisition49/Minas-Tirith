@@ -29,6 +29,10 @@ impl MergedCandidate {
         "OpenLibrary",
     ];
 
+    /// Group `items` by a dedup key (DOI, then ISBN, then title+author) and
+    /// merge each group into a single [`MergedCandidate`], preferring values
+    /// from higher-priority providers. Results are sorted by title.
+    #[must_use]
     pub fn merge_candidates(items: Vec<Box<dyn ItemMetadata>>) -> Vec<MergedCandidate> {
         let mut groups: HashMap<String, Vec<Box<dyn ItemMetadata>>> = HashMap::new();
         for item in items {
@@ -67,7 +71,7 @@ impl MergedCandidate {
                         (Some(d), None) => out.description = Some(d.to_string()),
                         // NOTE: prefer longer description/abstracts over shorter ones
                         (Some(d), Some(current)) if d.len() > current.len() => {
-                            out.description = Some(d.to_string())
+                            out.description = Some(d.to_string());
                         }
                         _ => {}
                     }
@@ -118,7 +122,7 @@ impl MergedCandidate {
 
     fn normalize_isbn(isbn: &str) -> String {
         isbn.chars()
-            .filter(|c| c.is_ascii_alphabetic())
+            .filter(char::is_ascii_alphabetic)
             .collect::<String>()
             .to_lowercase()
     }

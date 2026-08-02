@@ -26,6 +26,9 @@ pub struct CollectionAssignState {
 }
 
 impl CollectionAssignState {
+    /// Start an assignment session in `mode` for the entity identified by
+    /// `id`, with `original` as the set of currently associated ids.
+    #[must_use]
     pub fn new(mode: AssignMode, id: i32, original: HashSet<i32>) -> Self {
         let selected = original.clone();
         Self {
@@ -37,40 +40,58 @@ impl CollectionAssignState {
         }
     }
 
+    /// Whether this session assigns items to a collection or collections
+    /// to an item.
+    #[must_use]
     pub fn mode(&self) -> AssignMode {
         self.mode
     }
 
+    /// Id of the collection or item this session is assigning to.
+    #[must_use]
     pub fn id(&self) -> i32 {
         self.id
     }
 
+    /// Ids currently selected in this assignment session.
+    #[must_use]
     pub fn selected(&self) -> &HashSet<i32> {
         &self.selected
     }
 
+    /// Mutable access to the ids currently selected in this assignment
+    /// session.
     pub fn selected_mut(&mut self) -> &mut HashSet<i32> {
         &mut self.selected
     }
 
+    /// Ids that are newly selected and need to be added.
     pub fn add_list(&self) -> Difference<'_, i32, RandomState> {
         self.selected.difference(&self.original)
     }
 
+    /// Ids that were originally selected and need to be removed.
     pub fn remove_list(&self) -> Difference<'_, i32, RandomState> {
         self.original.difference(&self.selected)
     }
 
+    /// Index of the currently highlighted row in the assignment list.
+    #[must_use]
     pub fn selected_index(&self) -> Option<usize> {
         self.selected_index
     }
 
+    /// Mutable access to the index of the currently highlighted row in the
+    /// assignment list.
     pub fn selected_index_mut(&mut self) -> &mut Option<usize> {
         &mut self.selected_index
     }
 }
 
 impl CollectionState {
+    /// Start an item-assignment session for the currently selected
+    /// collection. Returns `false` if `items` is empty, no collection is
+    /// selected, or the trivial "All" collection is selected.
     pub fn open_item_assign(&mut self, items: &[DatabaseItem]) -> bool {
         if items.is_empty() {
             return false;
@@ -97,6 +118,8 @@ impl CollectionState {
         true
     }
 
+    /// Start a collection-assignment session for the item identified by
+    /// `item_id`, with `original` as its currently assigned collection ids.
     pub fn open_collection_assign(&mut self, item_id: i32, original: HashSet<i32>) {
         self.assign = Some(CollectionAssignState::new(
             AssignMode::Collections,
@@ -105,6 +128,8 @@ impl CollectionState {
         ));
     }
 
+    /// Move the assignment highlight to the next row, wrapping around.
+    /// No-op if no assignment session is active.
     pub fn assign_next(&mut self, items_len: usize) {
         let Some(assign) = self.assign.as_mut() else {
             return;
@@ -124,6 +149,8 @@ impl CollectionState {
         assign.selected_index_mut().replace(i);
     }
 
+    /// Move the assignment highlight to the previous row, wrapping around.
+    /// No-op if no assignment session is active.
     pub fn assign_prev(&mut self, items_len: usize) {
         let Some(assign) = self.assign.as_mut() else {
             return;
@@ -143,6 +170,8 @@ impl CollectionState {
         assign.selected_index_mut().replace(i);
     }
 
+    /// Toggle selection of the currently highlighted row in the active
+    /// assignment session.
     pub fn assign_toggle_current(&mut self, items: &[DatabaseItem]) {
         let Some(assign) = self.assign.as_mut() else {
             return;
@@ -171,10 +200,16 @@ impl CollectionState {
         }
     }
 
+    /// Discard the active assignment session, if any.
     pub fn cancel_assign(&mut self) {
-        self.assign = None
+        self.assign = None;
     }
 
+    /// Commit the active assignment session, adding/removing associations
+    /// as needed.
+    /// # Errors
+    /// Returns an error if any add/remove operation against the archive
+    /// fails.
     pub async fn confirm_assign(&mut self) -> Result<()> {
         let Some(assign) = self.assign.take() else {
             return Ok(());
