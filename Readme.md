@@ -12,7 +12,8 @@ Minas Tirith is a terminal-first, offline-capable personal reference manager for
 
 - Add references by picking a local `.pdf` or `.epub` file from an in-app file explorer
 - Review and edit fetched metadata before saving, or edit it later
-- Organize items into collections; filter the item list by collection and by item type
+- Organize items into collections; filter the items using collections and tabs
+  or using the search bar using a simple Query language
 - Export a single item, or an entire collection, as BibTeX to the system clipboard
 - Cover art shown inline in the terminal: cached/downloaded covers, or generated locally
   (PDF: first page via `pdftoppm`; EPUB: embedded cover via the `epub` crate)
@@ -33,7 +34,7 @@ Candidates are pulled from multiple providers and merged/deduplicated before you
 
 **Peer-to-peer library sharing**
 
-Built on [iroh](https://iroh.computer) — no accounts, no central server:
+Built on [iroh](https://iroh.computer), so no accounts and no central server:
 
 - Publish a collection as a shared library; get back an invite ticket to hand out
 - Subscribe to someone else's shared library using their ticket
@@ -167,6 +168,50 @@ items ──┬── item_authors ──── authors
 
 `shared_libraries` tracks collections you've published; `library_subscriptions` tracks libraries you follow from other peers.
 
+## Search Query Language
+
+The search input bar use the following simplified query language to search and apply filters,
+e.g. `tags~[DBMS, Compiler] && collection=databases` means all items in the *"databases"* collection
+with either *DBMS*, *Compiler* tags or both.
+
+### Single-valued Search fields
+
+Items can be queried with single valued fields:
+
+| Name | Description | Example |
+| ------ | ------------- | --------- |
+| `title` | Title of the item | `title ~ "Database Systems"` |
+| `description` | item description or abstract | `description ~ "SQL/PSM, SQL/CLI, JDBC, ODL, and XML"` |
+| `type` | item type | `type = book` |
+| `doi` | Digital Object Identifier | `doi = "10.1145/2088883.2088908"` |
+| `isbn` | International Standard Book Number | `isbn = 978-0-13-031995-1` |
+| `published` | Publication date or year | `published = 2018` |
+
+### Multi-valued Search fields
+
+The `author`, `tag`, `and` `collection` fields are different because an item can have **multiple** of them.
+Those fields could also be referred with their plural form (`authors`, `tags`, `collections`).
+Multi-valued fields accepts comma separated values list inside square brackets (`[...]`).
+Query like `tag = DBMS` are automatically de-sugared to `tag = [DBMS]`.
+
+### Matching operators
+
+| Operator | Field Type | What it does | Example |
+| :------: | :--------: | ------------ | ------- |
+| `=` | Single-valued | Exact match | `type = book` |
+| `~` | Single-valued | Partial/susbstring match | `title ~ "compilers principles"`|
+| `=` | Multi-valued | Contains **ALL** listed values| `tags = [SQL, DBMS, Algorithm]`|
+| `~`| Multi-valued | Contains **ANY** listed values | `tags ~ [SQL, DBMS, Algorithm]` |
+
+### Combining Search Rules
+
+As expected you can combine multiple criteria using logical operators and parentheses:
+
+- `&&` **(AND)**: Both rules must be true
+- `||` **(OR)**: At least one rule must be true
+- `!` **(NOT)**: Exclude matching items
+- `(...)`: Group rules together
+
 ## Status
 
 This repository is in **active development**.
@@ -177,6 +222,5 @@ Peer-to-peer library sharing (publish/subscribe/browse/import) is implemented an
 
 Known limitations:
 
-- Search mode is unfinished (`/` enters an unimplemented UI path)
 - The GUI crate (`minastirith-gui`) is an early scaffold, not yet usable
 - P2P sharing UX and reliability are still evolving
