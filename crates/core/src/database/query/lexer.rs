@@ -36,11 +36,11 @@ pub enum QueryToken {
     FieldIsbn,
     #[token("published")]
     FieldPublicationDate,
-    #[token("author")]
+    #[regex(r"(authors?)", |_| {})]
     FieldAuthor,
-    #[token("tag")]
+    #[regex(r"(tags?)", |_| {})]
     FieldTag,
-    #[token("collection")]
+    #[regex(r"(collections?)", |_| {})]
     FieldCollection,
     // NOTE: values
     #[regex(r#""([^"\\]|\\.)*""#, |lex| unescape(lex.slice()))]
