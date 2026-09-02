@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use minastirith_core::{
     database::Archive, metadata::facade::MetadataProvider, schema::message::Message,
-    state::metadata::MetadataState,
+    state::metadata::MetadataState, traits::Selectable,
 };
 use ratatui::widgets::ListState;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::schema::tui_metadata_form::TuiMetadataForm;
+use crate::{schema::tui_metadata_form::TuiMetadataForm, traits::SelectableSync};
 
 pub struct MetadataComponent {
     core: MetadataState<TuiMetadataForm>,
@@ -42,5 +42,18 @@ impl MetadataComponent {
     /// `ListState`.
     pub fn list_state_mut(&mut self) -> &mut ListState {
         &mut self.list_state
+    }
+}
+
+impl SelectableSync for MetadataComponent {
+    type Inner = MetadataState<TuiMetadataForm>;
+
+    fn inner(&mut self) -> &mut Self::Inner {
+        &mut self.core
+    }
+
+    fn sync(&mut self) {
+        let i = self.inner().selected_index();
+        self.list_state.select(i);
     }
 }

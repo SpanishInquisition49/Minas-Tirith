@@ -5,6 +5,7 @@ use minastirith_core::{
 };
 use ratatui_notifications::Level;
 
+use crate::traits::SelectableSync;
 use crate::tui::app::{App, Mode, components::cover::CoverMessage};
 
 impl App {
@@ -14,6 +15,7 @@ impl App {
             .metadata_component
             .core_mut()
             .on_search_results(candidates, path);
+        self.metadata_component.sync();
         if has_candidates {
             self.mode = Mode::MetadataSelect;
         } else {

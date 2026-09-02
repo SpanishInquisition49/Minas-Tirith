@@ -10,6 +10,7 @@ use ratatui_image::protocol::StatefulProtocol;
 
 use crate::{
     schema::tui_metadata_form::TuiMetadataForm,
+    traits::SelectableSync,
     tui::app::{App, Mode},
 };
 
@@ -65,12 +66,12 @@ impl App {
 
     /// Select the previous metadata candidate.
     pub fn select_metadata_prev(&mut self) {
-        self.metadata_component.core_mut().select_prev();
+        self.metadata_component.select_prev();
     }
 
     /// Select the next metadata candidate.
     pub fn select_metadata_next(&mut self) {
-        self.metadata_component.core_mut().select_next();
+        self.metadata_component.select_next();
     }
 
     /// Open the edit form pre-filled from the currently selected metadata
