@@ -15,7 +15,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Padding, Paragraph},
 };
 
-use crate::tui::app::App;
+use crate::tui::{app::App, ui::icons};
 
 /// Render the library publish popup.
 pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
@@ -29,9 +29,9 @@ pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
     };
 
     let title = if library_publish_state.is_publishing() {
-        " Publishing... "
+        format!(" {} Publishing... ", icons::UPLOAD)
     } else {
-        " Published as Library "
+        format!(" {} Published as Library ", icons::UPLOAD)
     };
 
     let block = Block::default()
@@ -42,11 +42,11 @@ pub fn draw_library_publish_popup(f: &mut Frame, app: &mut App) {
         .title(title.bold().italic().yellow())
         .title_bottom(
             Line::from(vec![
-                " Field: ".yellow(),
+                format!(" {} Field: ", icons::EXCHANGE).yellow(),
                 "<Tab> ".green(),
-                "Confirm: ".yellow(),
+                format!("{} Confirm: ", icons::CHECK).yellow(),
                 "<Ctrl+S> ".green(),
-                "Cancel: ".yellow(),
+                format!("{} Cancel: ", icons::CLOSE).yellow(),
                 "<Esc> ".green(),
             ])
             .right_aligned(),
@@ -127,14 +127,14 @@ pub fn draw_library_subscribe_popup(f: &mut Frame, app: &mut App) {
         .border_set(border::THICK)
         .border_style(Style::default().blue())
         .padding(Padding::uniform(1))
-        .title(" Subscribe to library ".bold().italic().yellow())
+        .title(format!(" {} Subscribe to library ", icons::RSS).bold().italic().yellow())
         .title_bottom(
             Line::from(vec![
-                " Field: ".yellow(),
+                format!(" {} Field: ", icons::EXCHANGE).yellow(),
                 "<Tab> ".green(),
-                "Confirm: ".yellow(),
+                format!("{} Confirm: ", icons::CHECK).yellow(),
                 "<Ctrl+S> ".green(),
-                "Cancel: ".yellow(),
+                format!("{} Cancel: ", icons::CLOSE).yellow(),
                 "<Esc> ".green(),
             ])
             .right_aligned(),
@@ -219,8 +219,14 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
                     Style::default().blue()
                 })
                 .padding(Padding::uniform(1))
-                .title(" Subscribed Libraries ".bold().yellow())
-                .title_bottom(Line::from(vec![" Add: ".yellow(), "<a> ".green()]).right_aligned()),
+                .title(format!(" {} Subscribed Libraries ", icons::RSS).bold().yellow())
+                .title_bottom(
+                    Line::from(vec![
+                        format!(" {} Add: ", icons::PLUS).yellow(),
+                        "<a> ".green(),
+                    ])
+                    .right_aligned(),
+                ),
         )
         .highlight_style(Style::default().green());
 
@@ -254,14 +260,14 @@ pub fn draw_library_browse_popup(f: &mut Frame, app: &mut App) {
                     Style::default().blue()
                 })
                 .padding(Padding::uniform(1))
-                .title(" Available tomes ".bold().yellow())
+                .title(format!(" {} Available tomes ", icons::BOOK).bold().yellow())
                 .title_bottom(
                     Line::from(vec![
-                        " Import: ".yellow(),
+                        format!(" {} Import: ", icons::DOWNLOAD).yellow(),
                         "<Enter> ".green(),
-                        " Focus: ".yellow(),
+                        format!(" {} Focus: ", icons::EXCHANGE).yellow(),
                         "<Tab> ".green(),
-                        " Close: ".yellow(),
+                        format!(" {} Close: ", icons::CLOSE).yellow(),
                         "<Esc> ".green(),
                     ])
                     .right_aligned(),
@@ -304,16 +310,16 @@ pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
                 .border_set(border::THICK)
                 .border_style(Style::default().green())
                 .padding(Padding::uniform(1))
-                .title(" My Libraries ".bold().italic().yellow())
+                .title(format!(" {} My Libraries ", icons::BOOK).bold().italic().yellow())
                 .title_bottom(
                     Line::from(vec![
-                        " Ticket: ".yellow(),
+                        format!(" {} Ticket: ", icons::TICKET).yellow(),
                         "<t> ".green(),
-                        " Delete: ".yellow(),
+                        format!(" {} Delete: ", icons::TRASH).yellow(),
                         "<d> ".green(),
-                        " Copy: ".yellow(),
+                        format!(" {} Copy: ", icons::COPY).yellow(),
                         "<c> ".green(),
-                        " Close: ".yellow(),
+                        format!(" {} Close: ", icons::CLOSE).yellow(),
                         "<Esc> ".green(),
                     ])
                     .right_aligned(),
@@ -326,7 +332,7 @@ pub fn draw_library_manage_popup(f: &mut Frame, app: &mut App) {
         .border_set(border::THICK)
         .border_style(Style::default().blue())
         .padding(Padding::uniform(1))
-        .title(" Details ".bold().italic().yellow());
+        .title(format!(" {} Details ", icons::INFO).bold().italic().yellow());
     let inner = detail_block.inner(cols[1]);
     f.render_widget(detail_block, cols[1]);
 

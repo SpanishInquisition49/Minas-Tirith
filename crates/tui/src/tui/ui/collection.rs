@@ -10,7 +10,10 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Padding, Paragraph},
 };
 
-use crate::tui::app::{App, Focus};
+use crate::tui::{
+    app::{App, Focus},
+    ui::icons,
+};
 
 /// Render the collection sidebar.
 pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
@@ -34,14 +37,16 @@ pub fn draw_collection_sidebar(f: &mut Frame, app: &mut App, area: Rect) {
                 .border_set(border::THICK)
                 .border_style(border_style)
                 .padding(Padding::uniform(1))
-                .title(Line::from(" Collections ".bold().italic().yellow()))
+                .title(Line::from(
+                    format!(" {} Collections ", icons::FOLDER).bold().italic().yellow(),
+                ))
                 .title_bottom(
                     Line::from(vec![
-                        " New: ".yellow(),
+                        format!(" {} New: ", icons::PLUS).yellow(),
                         "<n> ".green(),
-                        "Delete: ".yellow(),
+                        format!("{} Delete: ", icons::TRASH).yellow(),
                         "<d> ".green(),
-                        "Export Bibtex: ".yellow(),
+                        format!("{} Export Bibtex: ", icons::DOWNLOAD).yellow(),
                         "<b> ".green(),
                     ])
                     .right_aligned(),
@@ -62,11 +67,13 @@ pub fn draw_collection_create_popup(f: &mut Frame, app: &mut App) {
         Block::bordered()
             .border_set(border::THICK)
             .border_style(Style::default().blue())
-            .title(" New collection name ".yellow().italic())
+            .title(format!(" {} New collection name ", icons::FOLDER).yellow().italic())
             .title_bottom(
-                Line::from(" <Enter> Confirm  <Esc> Cancel ")
-                    .right_aligned()
-                    .yellow(),
+                Line::from(vec![
+                    format!(" {} <Enter> Confirm  ", icons::CHECK).yellow(),
+                    format!("{} <Esc> Cancel ", icons::CLOSE).yellow(),
+                ])
+                .right_aligned(),
             ),
     );
     f.render_widget(input, center);
@@ -92,9 +99,9 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
                 .iter()
                 .map(|i| {
                     let mark = if state.selected().contains(&i.id) {
-                        "[x]"
+                        icons::CHECKBOX_CHECKED
                     } else {
-                        "[ ]"
+                        icons::CHECKBOX_UNCHECKED
                     };
                     ListItem::new(format!("{mark} {}", i.fields.title))
                 })
@@ -108,7 +115,11 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
             });
             (
                 items,
-                format!(" Edit items for '{}' ", collection_name.unwrap_or_default()),
+                format!(
+                    " {} Edit items for '{}' ",
+                    icons::FOLDER,
+                    collection_name.unwrap_or_default()
+                ),
             )
         }
         AssignMode::Collections => {
@@ -119,9 +130,9 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
                 .filter(|c| !Collection::is_trivial_collection(c.id))
                 .map(|c| {
                     let mark = if state.selected().contains(&c.id) {
-                        "[x]"
+                        icons::CHECKBOX_CHECKED
                     } else {
-                        "[ ]"
+                        icons::CHECKBOX_UNCHECKED
                     };
                     ListItem::new(format!("{mark} {}", c.name))
                 })
@@ -136,7 +147,8 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
             (
                 items,
                 format!(
-                    " Edit collections for '{}' ",
+                    " {} Edit collections for '{}' ",
+                    icons::FOLDER,
                     item_title.unwrap_or_default()
                 ),
             )
@@ -153,11 +165,11 @@ pub fn draw_collection_assign_popup(f: &mut Frame, app: &mut App) {
                 .title(Line::from(title.bold().italic().yellow()))
                 .title_bottom(
                     Line::from(vec![
-                        " Toggle: ".yellow(),
+                        format!(" {} Toggle: ", icons::CHECK).yellow(),
                         "<Space>".green(),
-                        " Save: ".yellow(),
+                        format!(" {} Save: ", icons::UPLOAD).yellow(),
                         "<Ctrl+S>".green(),
-                        " Cancel: ".yellow(),
+                        format!(" {} Cancel: ", icons::CLOSE).yellow(),
                         "<Esc> ".green(),
                     ])
                     .right_aligned(),

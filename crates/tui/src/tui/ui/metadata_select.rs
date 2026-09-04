@@ -9,7 +9,10 @@ use ratatui::{
 
 use crate::{
     traits::Spannable,
-    tui::{app::App, ui::source_tag::SourceTag},
+    tui::{
+        app::App,
+        ui::{icons, source_tag::SourceTag},
+    },
 };
 
 /// Render the metadata candidate selection popup.
@@ -47,7 +50,12 @@ pub fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
 
         let lines = ListItem::new(vec![
             Line::from(vec![
-                format!("[{}] ", candidate.item_type).dim(),
+                format!(
+                    "{} [{}] ",
+                    icons::item_type_icon(candidate.item_type),
+                    candidate.item_type
+                )
+                .dim(),
                 candidate.title.clone().bold(),
             ]),
             Line::from(vec![
@@ -68,11 +76,18 @@ pub fn draw_metadata_select_popup(f: &mut Frame, app: &mut App) {
                 .border_set(border::THICK)
                 .border_style(Style::default().blue())
                 .padding(Padding::uniform(1))
-                .title(Line::from("Select metadata".bold()).yellow().italic())
+                .title(
+                    Line::from(format!("{} Select metadata", icons::LIST).bold())
+                        .yellow()
+                        .italic(),
+                )
                 .title_bottom(
-                    Line::from(" <Enter> Confirm  <Esc> Cancel ")
-                        .right_aligned()
-                        .yellow(),
+                    Line::from(vec![
+                        Span::from(format!(" {} <Enter> Confirm  ", icons::CHECK)),
+                        Span::from(format!("{} <Esc> Cancel ", icons::CLOSE)),
+                    ])
+                    .right_aligned()
+                    .yellow(),
                 ),
         )
         .highlight_style(Style::default().green());

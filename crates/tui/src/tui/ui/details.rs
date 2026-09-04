@@ -9,11 +9,14 @@ use ratatui::{
 };
 use ratatui_image::StatefulImage;
 
-use crate::{traits::Spannable, tui::app::App};
+use crate::{
+    traits::Spannable,
+    tui::{app::App, ui::icons},
+};
 
 /// Render the selected item's details panel.
 pub fn draw_details(f: &mut Frame, app: &mut App, area: Rect) {
-    let title = Line::from(" Details ".yellow().bold().italic());
+    let title = Line::from(format!(" {} Details ", icons::INFO).yellow().bold().italic());
     let instructions = instructions();
     let mut block = Block::default()
         .borders(Borders::ALL)
@@ -50,31 +53,37 @@ fn build_details_card(item: &DatabaseItem, text_width: u16) -> Vec<Line<'_>> {
     let item_type = ItemType::try_from(item.fields.r#type.as_str()).unwrap_or(ItemType::default());
     let titles_style = Style::new().bold().dark_gray();
     let mut card = vec![];
-    card.push(Line::from("Authors:\n".bold().style(titles_style)));
-    let authors_pills: Vec<(usize, Span<'_>)> = item
+    card.push(Line::from(
+        format!("{} Authors:", icons::AUTHOR)
+            .bold()
+            .style(titles_style),
+    ));
+    let authors: Vec<(usize, Span<'_>)> = item
         .authors
         .iter()
-        .map(|a| (a.span_len(), a.to_span()))
+        .map(|a| (a.span_text().chars().count(), Span::raw(a.span_text())))
         .collect();
-    card.extend(wrap_pills(authors_pills, text_width));
+    card.extend(wrap_dot_separated(authors, text_width));
     card.push(Line::from(Span::styled(
         symbols::DOT.repeat(text_width as usize),
         Style::default().dark_gray(),
     )));
     card.push(Line::from(vec![
-        "Type: ".bold().style(titles_style),
+        format!("{} Type: ", icons::item_type_icon(item_type))
+            .bold()
+            .style(titles_style),
         item.fields.r#type.clone().into(),
     ]));
     if let Some(container) = &item.fields.container {
-        let name = match item_type {
-            ItemType::Book => "Publisher: ",
-            ItemType::Article => "Journal: ",
-            ItemType::Report => "Institution: ",
-            ItemType::Thesis => "University: ",
-            ItemType::Misc => "How Published: ",
+        let (icon, name) = match item_type {
+            ItemType::Book => (icons::BUILDING, "Publisher: "),
+            ItemType::Article => (icons::ARTICLE, "Journal: "),
+            ItemType::Report => (icons::BUILDING, "Institution: "),
+            ItemType::Thesis => (icons::THESIS, "University: "),
+            ItemType::Misc => (icons::INFO, "How Published: "),
         };
         card.extend(wrap_labeled_field(
-            name,
+            &format!("{icon} {name}"),
             container,
             text_width,
             Style::default().bold().dark_gray(),
@@ -83,19 +92,21 @@ fn build_details_card(item: &DatabaseItem, text_width: u16) -> Vec<Line<'_>> {
 
     if let Some(date) = &item.fields.publication_date {
         card.push(Line::from(vec![
-            "Publication Date: ".bold().style(titles_style),
+            format!("{} Publication Date: ", icons::CALENDAR)
+                .bold()
+                .style(titles_style),
             date.into(),
         ]));
     }
     if let Some(doi) = &item.fields.doi {
         card.push(Line::from(vec![
-            "DOI: ".bold().style(titles_style),
+            format!("{} DOI: ", icons::HASHTAG).bold().style(titles_style),
             doi.into(),
         ]));
     }
     if let Some(isbn) = &item.fields.isbn {
         card.push(Line::from(vec![
-            "ISBN: ".bold().style(titles_style),
+            format!("{} ISBN: ", icons::BARCODE).bold().style(titles_style),
             isbn.into(),
         ]));
     }
@@ -105,7 +116,11 @@ fn build_details_card(item: &DatabaseItem, text_width: u16) -> Vec<Line<'_>> {
             .iter()
             .map(|c| (c.span_len(), c.to_span()))
             .collect();
-        card.push(Line::from("Collections: ".bold().style(titles_style)));
+        card.push(Line::from(
+            format!("{} Collections: ", icons::FOLDER)
+                .bold()
+                .style(titles_style),
+        ));
         card.extend(wrap_pills(collections, text_width));
     }
 
@@ -115,7 +130,9 @@ fn build_details_card(item: &DatabaseItem, text_width: u16) -> Vec<Line<'_>> {
             .iter()
             .map(|t| (t.span_len(), t.to_span()))
             .collect();
-        card.push(Line::from("Tags: ".bold().style(titles_style)));
+        card.push(Line::from(
+            format!("{} Tags: ", icons::TAG).bold().style(titles_style),
+        ));
         card.extend(wrap_pills(tags, text_width));
     }
 
@@ -124,7 +141,7 @@ fn build_details_card(item: &DatabaseItem, text_width: u16) -> Vec<Line<'_>> {
         Style::default().dark_gray(),
     )));
     card.extend(wrap_labeled_field(
-        "Abstract: ",
+        &format!("{} Abstract: ", icons::ALIGN_LEFT),
         &format!(
             "\n{}",
             item.fields.description.clone().unwrap_or_default().as_str()
@@ -134,6 +151,34 @@ fn build_details_card(item: &DatabaseItem, text_width: u16) -> Vec<Line<'_>> {
     ));
 
     card
+}
+
+/// Wrap a sequence of plain-text spans (e.g. author names) joined by a dot
+/// separator, never splitting a single span across lines.
+fn wrap_dot_separated<'a>(items: Vec<(usize, Span<'a>)>, max_width: u16) -> Vec<Line<'a>> {
+    let max_width = max_width as usize;
+    let sep = format!(" {} ", symbols::DOT);
+    let sep_len = sep.chars().count();
+    let mut lines = Vec::new();
+    let mut current: Vec<Span<'a>> = Vec::new();
+    let mut used = 0usize;
+
+    for (w, span) in items {
+        let sep_cost = if current.is_empty() { 0 } else { sep_len };
+        if used + sep_cost + w > max_width && !current.is_empty() {
+            lines.push(Line::from(std::mem::take(&mut current)));
+            used = 0;
+        } else if sep_cost > 0 {
+            current.push(Span::styled(sep.clone(), Style::default().dark_gray()));
+            used += sep_cost;
+        }
+        current.push(span);
+        used += w;
+    }
+    if !current.is_empty() {
+        lines.push(Line::from(current));
+    }
+    lines
 }
 
 fn wrap_pills<'a>(pills: Vec<(usize, Span<'a>)>, max_width: u16) -> Vec<Line<'a>> {
@@ -229,17 +274,17 @@ fn draw_cover(has_cover_url: bool, f: &mut Frame, app: &mut App, area: Rect) {
 
 fn instructions<'a>() -> Line<'a> {
     Line::from(vec![
-        " Navigate: ".yellow(),
+        format!(" {} Navigate: ", icons::ARROWS_V).yellow(),
         "<j/k>".green().bold(),
-        " Add Tome: ".yellow(),
+        format!(" {} Add Tome: ", icons::PLUS).yellow(),
         "<a>".green().bold(),
-        " Edit Tome: ".yellow(),
+        format!(" {} Edit Tome: ", icons::PENCIL).yellow(),
         "<e>".green().bold(),
-        " Export Bibtex: ".yellow(),
+        format!(" {} Export Bibtex: ", icons::DOWNLOAD).yellow(),
         "<b>".green().bold(),
-        " Focus: ".yellow(),
+        format!(" {} Focus: ", icons::EXCHANGE).yellow(),
         "<Tab>".green().bold(),
-        " Quit: ".yellow(),
+        format!(" {} Quit: ", icons::POWER).yellow(),
         "<q> ".green().bold(),
     ])
 }

@@ -122,7 +122,7 @@ impl MergedCandidate {
 
     fn normalize_isbn(isbn: &str) -> String {
         isbn.chars()
-            .filter(char::is_ascii_alphabetic)
+            .filter(char::is_ascii_alphanumeric)
             .collect::<String>()
             .to_lowercase()
     }

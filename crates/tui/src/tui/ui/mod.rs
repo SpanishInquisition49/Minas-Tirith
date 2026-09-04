@@ -2,11 +2,12 @@ mod collection;
 mod details;
 mod form;
 mod help;
+pub(crate) mod icons;
 mod library;
 mod metadata_select;
 pub mod source_tag;
 
-use minastirith_core::state::item::TABS_LABELS;
+use minastirith_core::{metadata::common_metadata::ItemType, state::item::TABS_LABELS};
 use ratatui::{
     Frame,
     layout::{
@@ -62,12 +63,16 @@ pub fn draw(f: &mut Frame, app: &mut App) {
             .yellow()
             .italic()
     } else {
-        " Pick a tome ".bold().yellow().italic()
+        format!(" {} Pick a tome ", icons::BOOK).bold().yellow().italic()
     };
     let theme = Theme::default()
         .with_title_top(move |_| Line::from(title.clone()))
         .with_title_bottom(|_| {
-            Line::from(vec![" Select: ".yellow(), "<a> ".green()]).right_aligned()
+            Line::from(vec![
+                format!(" {} Select: ", icons::CHECK).yellow(),
+                "<a> ".green(),
+            ])
+            .right_aligned()
         })
         .with_block(Block::bordered().border_set(border::THICK).blue())
         .with_highlight_item_style(Style::default().add_modifier(Modifier::REVERSED).yellow())
@@ -130,7 +135,7 @@ fn draw_search_bar(f: &mut Frame, app: &mut App, area: Rect) {
         .borders(Borders::ALL)
         .border_set(border::THICK)
         .border_style(border_style)
-        .title(" Search ".italic().bold().yellow());
+        .title(format!(" {} Search ", icons::SEARCH).italic().bold().yellow());
     let value = Paragraph::new(search_text).block(block).style(text_style);
     f.render_widget(value, area);
 }
@@ -150,7 +155,14 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
     let items: Vec<ListItem> = app
         .items()
         .iter()
-        .map(|i| ListItem::new(i.fields.title.clone()))
+        .map(|i| {
+            let item_type = ItemType::try_from(i.fields.r#type.as_str()).unwrap_or_default();
+            ListItem::new(format!(
+                "{} {}",
+                icons::item_type_icon(item_type),
+                i.fields.title
+            ))
+        })
         .collect();
     let total = items.len();
     let index = app.selected_item_index().unwrap_or_default();

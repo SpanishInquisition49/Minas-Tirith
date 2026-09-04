@@ -8,7 +8,24 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Padding, Paragraph, Wrap},
 };
 
-use crate::tui::app::App;
+use crate::tui::{app::App, ui::icons};
+
+fn section_icon(section: &str) -> &'static str {
+    match section {
+        "Items" => icons::BOOK,
+        "Collections" | "Collection Create" | "Collection Assign" => icons::FOLDER,
+        "Global" => icons::GLOBE,
+        "File Explorer" => icons::SEARCH,
+        "Metadata Selection" => icons::LIST,
+        "Metadata Edit" => icons::PENCIL,
+        "Library Publish" => icons::UPLOAD,
+        "Library Subscribe" => icons::RSS,
+        "Library Browse" => icons::BOOK,
+        "Library Manage" => icons::TICKET,
+        "Help" => icons::KEYBOARD,
+        _ => icons::INFO,
+    }
+}
 
 /// Render the help popup.
 pub fn draw_help_popup(f: &mut Frame, app: &mut App) {
@@ -22,12 +39,12 @@ pub fn draw_help_popup(f: &mut Frame, app: &mut App) {
         .border_set(border::THICK)
         .border_style(Style::default().blue())
         .padding(Padding::uniform(1))
-        .title(" Keybindings ".bold().italic().yellow())
+        .title(format!(" {} Keybindings ", icons::KEYBOARD).bold().italic().yellow())
         .title_bottom(
             Line::from(vec![
-                " Scroll: ".yellow(),
+                format!(" {} Scroll: ", icons::ARROWS_V).yellow(),
                 "<j/k> ".green(),
-                " Close: ".yellow(),
+                format!("{} Close: ", icons::CLOSE).yellow(),
                 "<Esc> ".green(),
             ])
             .right_aligned(),
@@ -43,7 +60,11 @@ pub fn draw_help_popup(f: &mut Frame, app: &mut App) {
             if current_section.is_some() {
                 lines.push(Line::raw(""));
             }
-            lines.push(Line::from(entry.section.bold().yellow()));
+            lines.push(Line::from(
+                format!("{} {}", section_icon(entry.section), entry.section)
+                    .bold()
+                    .yellow(),
+            ));
             current_section = Some(entry.section);
         }
         lines.push(Line::from(vec![

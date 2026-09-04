@@ -13,7 +13,10 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Padding, Paragraph},
 };
 
-use crate::{schema::tui_metadata_form::TuiMetadataForm, tui::app::App};
+use crate::{
+    schema::tui_metadata_form::TuiMetadataForm,
+    tui::{app::App, ui::icons},
+};
 
 /// Render the metadata edit popup.
 pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
@@ -30,7 +33,12 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
                 .yellow(),
         )
     } else {
-        Line::from(" Edit metadata ".bold().italic().yellow())
+        Line::from(
+            format!(" {} Edit metadata ", icons::PENCIL)
+                .bold()
+                .italic()
+                .yellow(),
+        )
     };
 
     let block = Block::default()
@@ -41,13 +49,13 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         .title(title)
         .title_bottom(
             Line::from(vec![
-                " Move".yellow(),
+                format!(" {} Move", icons::ARROWS_V).yellow(),
                 " <j/k>".green(),
-                " Edit field".yellow(),
+                format!(" {} Edit field", icons::PENCIL).yellow(),
                 " <Enter>".green(),
-                " Save".yellow(),
+                format!(" {} Save", icons::UPLOAD).yellow(),
                 " <Ctrl+S>".green(),
-                " Cancel".yellow(),
+                format!(" {} Cancel", icons::CLOSE).yellow(),
                 " <Esc> ".green(),
             ])
             .yellow()
@@ -84,7 +92,7 @@ pub fn draw_metadata_edit_popup(f: &mut Frame, app: &mut App) {
         return;
     };
     lines.push(Line::from(vec![
-        "Type: ".bold(),
+        format!("{} Type: ", icons::item_type_icon(form.item_type)).bold(),
         form.item_type.to_string().into(),
         " (press 't' to cylce)".dim(),
     ]));
