@@ -1,5 +1,8 @@
 <h1 align="center">
-  <img src="./images/minas.png" style="width: 25%; height: auto;">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./images/logo/minas-tirith-lockup-stacked-white.svg">
+    <img src="./images/logo/minas-tirith-lockup-stacked.svg" alt="Minas Tirith" width="220">
+  </picture>
 </h1>
 
 # Minas Tirith
