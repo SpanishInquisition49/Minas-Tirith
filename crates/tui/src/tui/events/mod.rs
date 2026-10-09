@@ -4,7 +4,6 @@ use color_eyre::{Result, eyre::bail};
 use crossterm::event::EventStream;
 use futures::StreamExt;
 use ratatui::{Terminal, backend::Backend};
-use tokio::time::interval;
 
 use crate::tui::{app::App, ui::draw};
 
@@ -16,24 +15,32 @@ use crate::tui::{app::App, ui::draw};
 /// fails.
 pub async fn run<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
     let mut events = EventStream::new();
-    let mut tick = interval(Duration::from_millis(16));
 
     loop {
-        // HACK: couldn't hoist the error with the '?' operator
-        if let Err(e) = terminal.draw(|f| draw(f, app)) {
-            bail!("{e}");
-        }
+        let animating = app.notifications().has_notification() || app.is_searching_metadata();
+        let timeout = if animating {
+            Duration::from_millis(16)
+        } else {
+            Duration::from_millis(500)
+        };
+        let mut redraw = false;
 
-        app.notification_tick();
         tokio::select! {
             maybe_event = events.next() => {
-                if let Some(event) = maybe_event && let Ok(event) = event {
-                    app.handle(event).await?;
-                }
+                if let Some(Ok(event)) = maybe_event {app.handle(event).await?; redraw = true}
             }
-            _ = tick.tick() => {
-                app.poll_messages().await?;
-            }
+            Some(msg) = app.task_channel_rx.recv() => { app.handle_message(msg).await?; redraw = true; }
+            Some(msg) = app.cover_channel_rx.recv() => { app.handle_cover_message(msg); redraw = true; }
+            () = tokio::time::sleep(timeout) => {redraw = animating;}
+        }
+
+        if animating {
+            app.notification_tick();
+        }
+
+        // HACK: couldn't hoist the error with the '?' operator
+        if redraw && let Err(e) = terminal.draw(|f| draw(f, app)) {
+            bail!("{e}");
         }
 
         if app.quit() {

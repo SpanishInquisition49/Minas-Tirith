@@ -95,8 +95,8 @@ pub struct App {
     pub(in crate::tui::app) library_component: LibraryComponent,
     pub(in crate::tui::app) help_scroll: u16,
 
-    pub(in crate::tui::app) task_channel_rx: UnboundedReceiver<Message>,
-    pub(in crate::tui::app) cover_channel_rx: UnboundedReceiver<CoverMessage>,
+    pub task_channel_rx: UnboundedReceiver<Message>,
+    pub cover_channel_rx: UnboundedReceiver<CoverMessage>,
 }
 
 impl Focusable for App {

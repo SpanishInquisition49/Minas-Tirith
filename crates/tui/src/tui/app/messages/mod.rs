@@ -78,49 +78,42 @@ impl App {
         }
     }
 
-    /// Drain and apply all pending background-task and cover messages.
-    /// # Errors
-    /// Returns an error if applying a save-result message fails.
-    pub async fn poll_messages(&mut self) -> Result<()> {
-        // NOTE: Listen for core messages
-        while let Ok(message) = self.task_channel_rx.try_recv() {
-            match message {
-                Message::Save(outcome) => self.handle_save_message(outcome).await?,
-                Message::Metadata(candidates) => self.handle_metadata_search_message(candidates),
-                Message::Abstract(abstract_data) => self.handle_abstract_message(&abstract_data),
-                Message::LibraryItemsDiscovered(items_data) => {
-                    self.library_component
-                        .core_mut()
-                        .handle_items_discovered(items_data.namespace_id, items_data.items);
-                }
-                Message::ItemDownloadReady(download_ready_data) => {
-                    self.handle_item_download_ready(
-                        &download_ready_data.entry,
-                        download_ready_data.local_path,
-                    );
-                }
-                Message::ItemDownloadFailed(download_failed_data) => {
-                    self.notify(
-                        download_failed_data.reason,
-                        " Download tome ".to_string(),
-                        Level::Error,
-                    );
-                }
+    pub async fn handle_message(&mut self, message: Message) -> Result<()> {
+        match message {
+            Message::Save(outcome) => self.handle_save_message(outcome).await?,
+            Message::Metadata(candidates) => self.handle_metadata_search_message(candidates),
+            Message::Abstract(abstract_data) => self.handle_abstract_message(&abstract_data),
+            Message::LibraryItemsDiscovered(items_data) => {
+                self.library_component
+                    .core_mut()
+                    .handle_items_discovered(items_data.namespace_id, items_data.items);
+            }
+            Message::ItemDownloadReady(download_ready_data) => {
+                self.handle_item_download_ready(
+                    &download_ready_data.entry,
+                    download_ready_data.local_path,
+                );
+            }
+            Message::ItemDownloadFailed(download_failed_data) => {
+                self.notify(
+                    download_failed_data.reason,
+                    " Download tome ".to_string(),
+                    Level::Error,
+                );
             }
         }
-        // NOTE: Listen for cover messages
-        while let Ok(message) = self.cover_channel_rx.try_recv() {
-            match message {
-                CoverMessage::Ready(cover_image_data) => {
-                    self.covers.handle_ready(
-                        cover_image_data,
-                        self.items_component.core_mut().items_mut(),
-                    );
-                }
-                CoverMessage::Failed { item_id } => self.covers.handle_failed(item_id),
-            }
-        }
-
         Ok(())
+    }
+
+    pub fn handle_cover_message(&mut self, message: CoverMessage) {
+        match message {
+            CoverMessage::Ready(cover_image_data) => {
+                self.covers.handle_ready(
+                    cover_image_data,
+                    self.items_component.core_mut().items_mut(),
+                );
+            }
+            CoverMessage::Failed { item_id } => self.covers.handle_failed(item_id),
+        }
     }
 }
